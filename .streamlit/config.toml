@@ -18,3 +18,7 @@ primaryColor = "#3E6A99"
 backgroundColor = "#15181D"
 secondaryBackgroundColor = "#1F242B"
 textColor = "#E2E5E9"
+# Accents for the one highlighted phrase in a review (soft blue; muted amber for "One thing to
+# clarify"). Both are about 8:1 contrast or better against backgroundColor.
+blueTextColor = "#8DB8E6"
+orangeTextColor = "#E0B46A"

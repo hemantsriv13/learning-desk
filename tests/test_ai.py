@@ -7,7 +7,7 @@ import pytest
 
 from learning_desk import ai, db, prompts, provider
 
-from conftest import FEEDBACK_OK, QUESTIONS_OK, REVIEW_OK, REVIEW_V1_OK, make_session, store_v1_review
+from conftest import FEEDBACK_OK, QUESTIONS_OK, REVIEW_OK, REVIEW_V1_OK, make_session, store_v1_review, store_v2_review
 
 
 def test_review_is_stored_with_its_snapshot(fake):
@@ -105,11 +105,52 @@ def test_review_is_one_call_in_the_concise_format(fake):
     assert result.ok and result.parsed.clarification is None  # nothing to clarify is a valid answer
     assert len(fake.requests) == 1  # no second summarising call
     call = db.get_ai_call(result.call_id)
-    assert call["prompt_version"] == prompts.REVIEW_VERSION == "review-v2"
+    assert call["prompt_version"] == prompts.REVIEW_VERSION == "review-v3"
     schema = fake.requests[0]["output_config"]["format"]["schema"]
     assert set(schema["properties"]) == {"main_takeaway", "clarification", "next_step",
                                          "supporting_evidence", "general_explanations"}
+    assert "emphasis" in schema["properties"]["main_takeaway"]["required"]
+    assert "emphasis" in schema["properties"]["next_step"]["required"]
     assert "Do not invent a misconception" in fake.requests[0]["system"]
+
+
+def _with_emphasis(field: str, phrase):
+    return {**REVIEW_OK, field: {**REVIEW_OK[field], "emphasis": phrase}}
+
+
+@pytest.mark.parametrize("reply", [
+    _with_emphasis("main_takeaway", "not in the text at all"),
+    _with_emphasis("main_takeaway", "client resends the history and more words here too please"),
+    _with_emphasis("main_takeaway", "lient resends"),  # starts mid-word
+    _with_emphasis("clarification", "**server**"),
+    _with_emphasis("next_step", ""),
+])
+def test_unusable_emphasis_never_rejects_the_review(fake, reply):
+    session_id = make_session()
+    fake.reply(reply)
+    result = ai.review_session(session_id)
+
+    assert result.ok
+    assert result.warnings == []  # not shown as a warning
+    assert "Highlight for" in db.get_ai_call(result.call_id)["warnings_json"]  # but recorded
+    assert len(fake.requests) == 1
+
+
+def test_emphasis_of_the_wrong_type_is_treated_as_missing(fake):
+    session_id = make_session()
+    fake.reply(_with_emphasis("next_step", 42))
+    result = ai.review_session(session_id)
+    assert result.ok and result.parsed.next_step.emphasis is None
+
+
+def test_emphasis_problem_accepts_only_exact_whole_word_phrases():
+    text = "The client resends the history."
+    assert prompts.emphasis_problem(text, "client resends the history") is None
+    assert prompts.emphasis_problem(text, None) == "no phrase given"
+    assert prompts.emphasis_problem(text, "Client resends") == "not an exact part of the text"
+    assert prompts.emphasis_problem(text, " client") is not None
+    assert prompts.emphasis_problem(text, "resends the hist") is not None
+    assert prompts.emphasis_problem("Use [S2] here", "Use [S2]") == "contains Markdown symbols"
 
 
 def test_stored_reviews_of_both_formats_still_parse(fake):
@@ -120,7 +161,10 @@ def test_stored_reviews_of_both_formats_still_parse(fake):
 
     assert isinstance(prompts.parse_stored_review(old["prompt_version"], old["parsed_json"]), prompts.ReviewV1)
     assert isinstance(prompts.parse_stored_review(new["prompt_version"], new["parsed_json"]), prompts.Review)
-    assert len(fake.requests) == 1  # reading the old review needed no call
+    v2 = db.get_ai_call(store_v2_review(session_id))
+    parsed = prompts.parse_stored_review(v2["prompt_version"], v2["parsed_json"])
+    assert parsed.main_takeaway.emphasis is None and parsed.next_step.emphasis is None
+    assert len(fake.requests) == 1  # reading the old reviews needed no call
 
 
 def test_instructions_and_session_content_are_kept_apart(fake):

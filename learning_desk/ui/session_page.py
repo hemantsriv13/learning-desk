@@ -224,18 +224,29 @@ def _render_focus(session: dict, call: dict, review, sections_by_id: dict, chang
             return
 
         st.markdown("##### Main takeaway")
-        st.markdown(safe_md(review.main_takeaway.text))
+        st.markdown(_emphasised(review.main_takeaway.text, review.main_takeaway.emphasis, "blue"))
         _cited_text(review.main_takeaway.section_refs, sections_by_id)
         if review.clarification:
             st.markdown("##### One thing to clarify")
-            st.markdown(safe_md(review.clarification.text))
+            st.markdown(_emphasised(review.clarification.text, review.clarification.emphasis, "orange"))
             _cited_text(review.clarification.section_refs, sections_by_id)
         st.markdown("##### Next step")
         _next_step(session, call, review.next_step)
 
 
-def _next_step(session: dict, call: dict, step: prompts.NextStep) -> None:
-    st.markdown(safe_md(f"**{step.kind.capitalize()}:** {step.text}"))
+def _emphasised(text: str, phrase: str | None, colour: str) -> str:
+    """Markdown for `text` with one phrase in bold and an accent colour. The colour names map to
+    blueTextColor / orangeTextColor in .streamlit/config.toml; the model only chooses which words.
+    A phrase that fails prompts.emphasis_problem() is ignored and the text is shown plain."""
+    if prompts.emphasis_problem(text, phrase):
+        return safe_md(text)
+    start = text.find(phrase)
+    end = start + len(phrase)
+    return f"{safe_md(text[:start])}:{colour}[**{phrase}**]{safe_md(text[end:])}"
+
+
+def _next_step(session: dict, call: dict, step: prompts.FocusedNextStep) -> None:
+    st.markdown(f"**{step.kind.capitalize()}:** " + _emphasised(step.text, step.emphasis, "blue"))
     source = "ai_suggestion:next_step"
     saved = any(q["source"] == source and q["source_call_id"] == call["id"]
                 for q in db.list_queue(session_id=session["id"]))

@@ -60,7 +60,9 @@ Never paste a key into a chat. The app never displays, stores or logs it.
 4. **Review this session**: one model call. The review shows three things: a **main takeaway**
    (at most two sentences), **one thing to clarify** (left out when there is nothing to clarify), and
    **one next step** of about five minutes. *Save to my queue* adds that step; nothing is added
-   automatically. Citations sit under the takeaway and the clarification. Two collapsed sections hold the
+   automatically. In each of the three, one short key phrase may be shown in bold colour (blue, or
+   amber for the clarification). The model picks the words; the app checks they appear exactly in that
+   text and otherwise shows plain text. Citations sit under the takeaway and the clarification. Two collapsed sections hold the
    rest: *Supporting evidence*, and *Technical details* (the AI call, earlier reviews, side-by-side
    comparison, failed attempts). Opening them never contacts the model. Reviews written before this
    format are marked "older format" and shown as they were stored.

@@ -116,7 +116,10 @@ def review_session(session_id: int) -> AIResult:
             # Keep the review, but flag citations that point at nothing.
             result.warnings.append("The model cited section numbers that do not exist in this snapshot: "
                                    + ", ".join(f"S{r}" for r in unknown))
-            _save_warnings(result.call_id, result.warnings)
+        # An unusable highlight is minor: recorded for Technical details, not shown as a warning.
+        recorded = result.warnings + result.parsed.emphasis_notes()
+        if recorded:
+            _save_warnings(result.call_id, recorded)
     return result
 
 

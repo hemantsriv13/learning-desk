@@ -7,7 +7,7 @@ from streamlit.testing.v1 import AppTest
 
 from learning_desk import ai, db
 
-from conftest import FEEDBACK_OK, QUESTIONS_OK, REVIEW_OK, REVIEW_V1_OK, make_session, store_v1_review
+from conftest import FEEDBACK_OK, QUESTIONS_OK, REVIEW_OK, REVIEW_V1_OK, make_session, store_v1_review, store_v2_review
 
 APP = str(Path(__file__).resolve().parent.parent / "app.py")
 
@@ -114,7 +114,7 @@ def test_new_review_shows_focused_view_with_details_collapsed(fake):
     focus = _markdown(at)
     for heading in ("Main takeaway", "One thing to clarify", "Next step"):
         assert heading in focus, heading
-    assert REVIEW_OK["main_takeaway"]["text"] in focus
+    assert "The API does not remember earlier requests" in focus
     for old_list in ("Possible gaps", "Observations you recorded", "Suggested experiments", "Suggested next steps"):
         assert old_list not in focus, old_list
     assert not any("older format" in m.value for m in at.markdown)
@@ -128,6 +128,60 @@ def test_new_review_shows_focused_view_with_details_collapsed(fake):
     technical = _expander(at, "Technical details")
     assert any("Raw response" in m.value for m in technical.markdown)
     assert len(fake.requests) == 1
+
+
+def test_one_phrase_per_section_is_highlighted(fake):
+    session_id = make_session()
+    fake.reply(REVIEW_OK)
+    ai.review_session(session_id)
+    at = _open_session(session_id)
+    assert not at.exception
+    md = _markdown(at)
+    assert ":blue[**the client resends the history**]" in md
+    assert ":orange[**the server stores history**]" in md
+    assert ":blue[**Send the same question twice**]" in md
+    assert md.count(":blue[") == 2 and md.count(":orange[") == 1
+    # The labels stay, so colour is never the only signal.
+    for heading in ("Main takeaway", "One thing to clarify", "Next step", "**Task:**"):
+        assert heading in md
+    assert len(fake.requests) == 1
+
+
+def test_unusable_emphasis_is_shown_as_plain_text(fake):
+    session_id = make_session()
+    fake.reply({**REVIEW_OK,
+                "main_takeaway": {**REVIEW_OK["main_takeaway"], "emphasis": "words the model made up"},
+                "clarification": {**REVIEW_OK["clarification"], "emphasis": "[S2]"},
+                "next_step": {**REVIEW_OK["next_step"], "emphasis": None}})
+    ai.review_session(session_id)
+    at = _open_session(session_id)
+    assert not at.exception and not at.error
+    md = _markdown(at)
+    assert ":blue[" not in md and ":orange[" not in md
+    assert REVIEW_OK["main_takeaway"]["text"] in md and REVIEW_OK["clarification"]["text"] in md
+    assert REVIEW_OK["next_step"]["text"] in md
+    # The ignored highlights are noted only inside Technical details.
+    assert any("Highlight for" in w.value for w in _expander(at, "Technical details").warning)
+    assert len(fake.requests) == 1
+
+
+def test_emphasis_keeps_the_rest_of_the_text_safe():
+    from learning_desk.ui.session_page import _emphasised
+    text = "See ![x](http://evil.example/p.png) then check the cached history first."
+    out = _emphasised(text, "check the cached history", "blue")
+    assert ":blue[**check the cached history**]" in out
+    assert "\\![x]" in out and " ![x]" not in out  # images stay disabled around the highlight
+
+
+def test_review_without_emphasis_fields_still_opens(fake):
+    session_id = make_session()
+    store_v2_review(session_id)
+    at = _open_session(session_id)
+    assert not at.exception
+    md = _markdown(at)
+    assert REVIEW_OK["main_takeaway"]["text"] in md and ":blue[" not in md
+    assert "older format" not in md
+    assert fake.requests == []
 
 
 def test_clarification_is_left_out_when_there_is_none(fake):
@@ -181,7 +235,7 @@ def test_history_and_comparison_make_no_model_calls(fake):
     fake.reply(REVIEW_OK)
     ai.review_session(session_id)
     at = _open_session(session_id)
-    assert REVIEW_OK["main_takeaway"]["text"] in _markdown(at)  # newest is shown first
+    assert "The API does not remember earlier requests" in _markdown(at)  # newest is shown first
 
     older = db.list_ai_calls(session_id, action="review", status="ok")[1]["id"]
     next(s for s in at.selectbox if s.label == "Review shown above").set_value(older)

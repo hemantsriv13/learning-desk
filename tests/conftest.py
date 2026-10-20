@@ -59,10 +59,11 @@ def fake(isolated):
 
 REVIEW_OK = {
     "main_takeaway": {"text": "The API does not remember earlier requests; the client resends the history.",
-                      "section_refs": [3]},
+                      "section_refs": [3], "emphasis": "the client resends the history"},
     "clarification": {"text": "Your explanation says the server stores history, but your test suggests "
-                              "it may not.", "section_refs": [2, 3]},
-    "next_step": {"kind": "task", "text": "Send the same question twice, once with the history included."},
+                              "it may not.", "section_refs": [2, 3], "emphasis": "the server stores history"},
+    "next_step": {"kind": "task", "text": "Send the same question twice, once with the history included.",
+                  "emphasis": "Send the same question twice"},
     "supporting_evidence": [{"text": "A second, separate request did not know the name.", "section_refs": [3]}],
     "general_explanations": [{"topic": "Statelessness", "explanation": "Each request stands alone."}],
 }
@@ -102,12 +103,25 @@ def make_session(**overrides) -> int:
     return db.create_session(**fields)
 
 
-def store_v1_review(session_id: int) -> int:
-    """Insert a review-v1 record directly, the way older versions of the app stored it."""
+def _store_review(session_id: int, version: str, parsed: dict) -> int:
     from learning_desk import ai
     snapshot_id, _, _ = ai.prepare_snapshot(session_id)
     return db.insert_ai_call({
         "session_id": session_id, "snapshot_id": snapshot_id, "action": "review",
-        "prompt_version": "review-v1", "requested_model": "old-model", "returned_model": "old-model",
-        "request_json": "{}", "raw_response": json.dumps(REVIEW_V1_OK), "status": "ok",
-        "parsed_json": json.dumps(REVIEW_V1_OK), "elapsed_ms": 1000})
+        "prompt_version": version, "requested_model": "old-model", "returned_model": "old-model",
+        "request_json": "{}", "raw_response": json.dumps(parsed), "status": "ok",
+        "parsed_json": json.dumps(parsed), "elapsed_ms": 1000})
+
+
+def store_v1_review(session_id: int) -> int:
+    """Insert a review-v1 record directly, the way older versions of the app stored it."""
+    return _store_review(session_id, "review-v1", REVIEW_V1_OK)
+
+
+def store_v2_review(session_id: int) -> int:
+    """Insert a review-v2 record: the concise format from before emphasis phrases existed."""
+    parsed = {**REVIEW_OK,
+              "main_takeaway": {k: v for k, v in REVIEW_OK["main_takeaway"].items() if k != "emphasis"},
+              "clarification": {k: v for k, v in REVIEW_OK["clarification"].items() if k != "emphasis"},
+              "next_step": {k: v for k, v in REVIEW_OK["next_step"].items() if k != "emphasis"}}
+    return _store_review(session_id, "review-v2", parsed)

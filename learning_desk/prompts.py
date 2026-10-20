@@ -25,15 +25,20 @@ Write plainly and concisely. Do not use praise, encouragement or motivational la
 # ---------------------------------------------------------------- review
 
 # review-v1 (a long review with many lists) was replaced by review-v2 (one takeaway, at most one
-# clarification, one next step). Reviews already stored in the old format are still read with
+# clarification, one next step). review-v3 adds an optional emphasis phrase to each of those three;
+# review-v2 records simply have none. Reviews already stored in the v1 format are still read with
 # ReviewV1 below; they are never regenerated.
-REVIEW_VERSION = "review-v2"
+REVIEW_VERSION = "review-v3"
 
 TAKEAWAY_MAX_CHARS = 400
 CLARIFICATION_MAX_CHARS = 400
 NEXT_STEP_MAX_CHARS = 300
 MAX_SUPPORTING_EVIDENCE = 3
 MAX_GENERAL_EXPLANATIONS = 2
+EMPHASIS_MAX_WORDS = 10
+# Characters that Markdown would interpret inside the highlighted phrase. A phrase containing any
+# of them is shown as plain text rather than risk breaking the formatting.
+EMPHASIS_FORBIDDEN = set("[]*_`~\\<>#|$")
 
 REVIEW_INSTRUCTIONS = f"""\
 You review a learner's notes from one study session about how AI applications work.
@@ -59,6 +64,10 @@ Produce:
 - general_explanations: up to {MAX_GENERAL_EXPLANATIONS} pieces of background from your general
   knowledge that are NOT in the notes and that the takeaway or clarification depends on. Empty list
   if none are needed.
+- emphasis (inside main_takeaway, clarification and next_step): one short phrase of 3-8 words,
+  copied exactly, character for character, from that item's own text. Pick the phrase that carries
+  the key idea; for next_step, the main action. It is shown highlighted so the learner can spot the
+  point at a glance. Use null if no single phrase stands out. Plain words only: no Markdown symbols.
 
 Do not add urgency, scores, ratings or encouragement.
 
@@ -78,11 +87,13 @@ def _list_of(properties: dict) -> dict:
 
 
 _GROUNDED = {"text": {"type": "string"}, "section_refs": _REF_LIST}
+_EMPHASIS = {"emphasis": {"anyOf": [{"type": "string"}, {"type": "null"}]}}
 
 REVIEW_SCHEMA = _obj({
-    "main_takeaway": _obj(_GROUNDED),
-    "clarification": {"anyOf": [_obj(_GROUNDED), {"type": "null"}]},
-    "next_step": _obj({"kind": {"type": "string", "enum": ["question", "task"]}, "text": {"type": "string"}}),
+    "main_takeaway": _obj({**_GROUNDED, **_EMPHASIS}),
+    "clarification": {"anyOf": [_obj({**_GROUNDED, **_EMPHASIS}), {"type": "null"}]},
+    "next_step": _obj({"kind": {"type": "string", "enum": ["question", "task"]}, "text": {"type": "string"},
+                       **_EMPHASIS}),
     "supporting_evidence": _list_of(_GROUNDED),
     "general_explanations": _list_of({"topic": {"type": "string"}, "explanation": {"type": "string"}}),
 })
@@ -106,14 +117,44 @@ def _short_text(value: str, limit: int, what: str) -> str:
     return value
 
 
-class Takeaway(GroundedItem):
+class Emphasised(Strict):
+    """An optional phrase to highlight. It is display-only: an unusable value never rejects the
+    review. It is kept as received and checked by emphasis_problem() when shown."""
+    emphasis: str | None = None  # absent in review-v2 records
+
+    @field_validator("emphasis", mode="before")
+    @classmethod
+    def ignore_non_text(cls, v):
+        return v if isinstance(v, str) else None
+
+
+def emphasis_problem(text: str, phrase: str | None) -> str | None:
+    """Why `phrase` cannot be highlighted inside `text`, or None if it can."""
+    if phrase is None:
+        return "no phrase given"
+    if not phrase.strip() or phrase != phrase.strip():
+        return "empty, or has leading or trailing spaces"
+    if len(phrase.split()) > EMPHASIS_MAX_WORDS:
+        return f"longer than {EMPHASIS_MAX_WORDS} words"
+    if EMPHASIS_FORBIDDEN & set(phrase):
+        return "contains Markdown symbols"
+    start = text.find(phrase)
+    if start < 0:
+        return "not an exact part of the text"
+    end = start + len(phrase)
+    if (start > 0 and text[start - 1].isalnum()) or (end < len(text) and text[end].isalnum()):
+        return "starts or ends in the middle of a word"
+    return None
+
+
+class Takeaway(GroundedItem, Emphasised):
     @field_validator("text")
     @classmethod
     def short(cls, v: str) -> str:
         return _short_text(v, TAKEAWAY_MAX_CHARS, "main_takeaway")
 
 
-class Clarification(GroundedItem):
+class Clarification(GroundedItem, Emphasised):
     @field_validator("text")
     @classmethod
     def short(cls, v: str) -> str:
@@ -136,7 +177,7 @@ class NextStep(Strict):
     text: str
 
 
-class FocusedNextStep(NextStep):
+class FocusedNextStep(NextStep, Emphasised):
     @field_validator("text")
     @classmethod
     def short(cls, v: str) -> str:
@@ -144,7 +185,7 @@ class FocusedNextStep(NextStep):
 
 
 class Review(Strict):
-    """The current (review-v2) format: one takeaway, at most one clarification, one next step."""
+    """The current (review-v2/v3) format: one takeaway, at most one clarification, one next step."""
     main_takeaway: Takeaway
     clarification: Clarification | None
     next_step: FocusedNextStep
@@ -169,6 +210,18 @@ class Review(Strict):
         items = [self.main_takeaway, *([self.clarification] if self.clarification else []),
                  *self.supporting_evidence]
         return [r for item in items for r in item.section_refs]
+
+    def emphasis_notes(self) -> list[str]:
+        """Emphasis phrases that were given but cannot be used (they are shown as plain text)."""
+        items = [("main_takeaway", self.main_takeaway), ("clarification", self.clarification),
+                 ("next_step", self.next_step)]
+        notes = []
+        for name, item in items:
+            if item is not None and item.emphasis is not None:
+                problem = emphasis_problem(item.text, item.emphasis)
+                if problem:
+                    notes.append(f"Highlight for {name} ignored ({problem}); shown as plain text.")
+        return notes
 
 
 class ReviewV1(Strict):
