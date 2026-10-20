@@ -1,0 +1,16 @@
+[server]
+# Only reachable from this computer.
+address = "localhost"
+port = 8501
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+
+[client]
+# Hide Streamlit's "Deploy" button; this app is meant to stay local.
+toolbarMode = "minimal"
+
+[theme]
+# Muted accent instead of Streamlit's default red.
+primaryColor = "#4F7CAC"
