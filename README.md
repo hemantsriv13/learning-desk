@@ -57,9 +57,13 @@ Never paste a key into a chat. The app never displays, stores or logs it.
    (Markdown and ``` code fences are supported). Click **Save**. The bar shows when you last saved and
    warns about unsaved changes.
 3. **Questions & next steps tab**: unresolved questions and tasks for this session. Edits save automatically.
-4. **Review this session**: one model call. Feedback appears in a bordered "AI feedback" box,
-   separate from your notes. Older reviews stay available; you can compare two side by side.
-   Suggested next steps go into your queue only when you click *Add* (you can edit them first).
+4. **Review this session**: one model call. The review shows three things: a **main takeaway**
+   (at most two sentences), **one thing to clarify** (left out when there is nothing to clarify), and
+   **one next step** of about five minutes. *Save to my queue* adds that step; nothing is added
+   automatically. Citations sit under the takeaway and the clarification. Two collapsed sections hold the
+   rest: *Supporting evidence*, and *Technical details* (the AI call, earlier reviews, side-by-side
+   comparison, failed attempts). Opening them never contacts the model. Reviews written before this
+   format are marked "older format" and shown as they were stored.
 5. **Test my understanding**: generates three questions (explanation, application, limitations)
    with no answers or hints. Write and *Submit* an answer, then *Get feedback on my answer*.
    There are no scores.
@@ -84,7 +88,7 @@ Never paste a key into a chat. The app never displays, stores or logs it.
    your notes are untouched.
 6. **Ordinary code:** citations are matched to the snapshot's text, so you can open "Cited: S3" and
    read exactly what the model was pointing at. Citations to sections that don't exist are flagged.
-7. Everything is recorded. **Inspect AI call** shows:
+7. Everything is recorded. **Inspect AI call** (for a review: *Technical details*) shows:
    - the action and instruction version
    - the full request, without credentials
    - the requested model and the model the API returned
@@ -128,7 +132,7 @@ wrong. Everything else is ordinary, deterministic software.
 | AI buttons are greyed out | `ANTHROPIC_API_KEY` is not set in the environment that started the app. Set it, then restart. |
 | "Model ... was not found (404)" | Set `LEARNING_DESK_MODEL` to a model your key can use. |
 | "The API key was rejected (401)" | The key is wrong or revoked. Create a new one in the Anthropic Console. |
-| "did not match the expected format" | The reply was rejected. Open *Inspect AI call* to see the raw response, then try again. |
+| "did not match the expected format" | The reply was rejected. Open *Technical details → Failed attempts* to see the raw response, then try again. |
 | "cut off at the token limit" | Raise `LEARNING_DESK_MAX_TOKENS` or split a very long session. |
 | Port 8501 in use | `.venv\Scripts\python -m streamlit run app.py --server.port 8502` |
 
@@ -163,9 +167,10 @@ top of this file shows the latest result. CI has no API key and needs none.
 
 ## Three small changes to learn from
 
-1. **Change an instruction and watch it travel.** In `prompts.py`, ask for "1-2 sentences" in the
-   review summary instead of "2-4" and set `REVIEW_VERSION = "review-v2"`. Run a review, then
-   compare the two in *Inspect AI call*. The version tells you which instructions produced which output.
+1. **Change an instruction and watch it travel.** In `prompts.py`, ask for "one short sentence" in the
+   main takeaway instead of "at most two short sentences" and set `REVIEW_VERSION = "review-v3"`. Run a
+   review, then compare the two under *Technical details*. The version tells you which instructions
+   produced which output.
 2. **Add a field to the schema.** Add `"confidence_note": {"type": "string"}` to `QUESTIONS_SCHEMA`
    and a `confidence_note: str` field to `QuestionSet`. Run `pytest` and see which test fails, and why
    a schema and its validator must change together.

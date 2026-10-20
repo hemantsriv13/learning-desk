@@ -58,6 +58,17 @@ def fake(isolated):
 
 
 REVIEW_OK = {
+    "main_takeaway": {"text": "The API does not remember earlier requests; the client resends the history.",
+                      "section_refs": [3]},
+    "clarification": {"text": "Your explanation says the server stores history, but your test suggests "
+                              "it may not.", "section_refs": [2, 3]},
+    "next_step": {"kind": "task", "text": "Send the same question twice, once with the history included."},
+    "supporting_evidence": [{"text": "A second, separate request did not know the name.", "section_refs": [3]}],
+    "general_explanations": [{"topic": "Statelessness", "explanation": "Each request stands alone."}],
+}
+
+# A review in the original review-v1 format, as stored before reviews were shortened.
+REVIEW_V1_OK = {
     "summary": "The session tests whether the API keeps conversation state.",
     "observations": [{"text": "A second, separate request did not know the name.", "section_refs": [3]}],
     "interpretations": [{"text": "The learner thinks the server stores history.", "section_refs": [2]}],
@@ -89,3 +100,14 @@ def make_session(**overrides) -> int:
               "sources": "https://example.com/a"}
     fields.update(overrides)
     return db.create_session(**fields)
+
+
+def store_v1_review(session_id: int) -> int:
+    """Insert a review-v1 record directly, the way older versions of the app stored it."""
+    from learning_desk import ai
+    snapshot_id, _, _ = ai.prepare_snapshot(session_id)
+    return db.insert_ai_call({
+        "session_id": session_id, "snapshot_id": snapshot_id, "action": "review",
+        "prompt_version": "review-v1", "requested_model": "old-model", "returned_model": "old-model",
+        "request_json": "{}", "raw_response": json.dumps(REVIEW_V1_OK), "status": "ok",
+        "parsed_json": json.dumps(REVIEW_V1_OK), "elapsed_ms": 1000})

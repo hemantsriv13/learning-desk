@@ -24,28 +24,43 @@ Write plainly and concisely. Do not use praise, encouragement or motivational la
 
 # ---------------------------------------------------------------- review
 
-REVIEW_VERSION = "review-v1"
+# review-v1 (a long review with many lists) was replaced by review-v2 (one takeaway, at most one
+# clarification, one next step). Reviews already stored in the old format are still read with
+# ReviewV1 below; they are never regenerated.
+REVIEW_VERSION = "review-v2"
+
+TAKEAWAY_MAX_CHARS = 400
+CLARIFICATION_MAX_CHARS = 400
+NEXT_STEP_MAX_CHARS = 300
+MAX_SUPPORTING_EVIDENCE = 3
+MAX_GENERAL_EXPLANATIONS = 2
 
 REVIEW_INSTRUCTIONS = f"""\
 You review a learner's notes from one study session about how AI applications work.
+The learner wants a short, focused review: one idea to take away, not a list of everything you notice.
 
 {SHARED_RULES}
 
+First decide which single learning point would help this learner most right now. Build the review
+around that point. Leave everything else out.
+
 Produce:
-- summary: 2-4 sentences on what the session covers.
-- observations: things the learner recorded seeing or measuring (outputs, results, behaviour).
-  Restate each one and list the section numbers it comes from in section_refs.
-- interpretations: the learner's explanations, assumptions or conclusions. Restate each as the
-  learner's interpretation, with section_refs.
-- possible_gaps: hypotheses about missing pieces or possible misconceptions. These are hypotheses,
-  not verdicts: phrase them tentatively and say in how_to_check what would confirm or refute them.
-  Cite the sections that prompted each one.
-- general_explanations: background you supply from general knowledge that is NOT in the notes.
-  Keep these separate so the learner can tell your knowledge apart from their own notes.
-- suggested_experiments: small experiments or questions that would test the learner's understanding.
-  Cite sections when relevant; use an empty list when none apply.
-- suggested_next_steps: up to 5 short, concrete items. kind is "question" (something to find out)
-  or "task" (something to do).
+- main_takeaway: at most two short sentences (under {TAKEAWAY_MAX_CHARS} characters) stating that
+  learning point. Cite the sections it is based on in section_refs.
+- clarification: one short correction or open uncertainty in the learner's notes, phrased tentatively
+  (under {CLARIFICATION_MAX_CHARS} characters), with the sections it concerns in section_refs.
+  Use null when nothing in the notes needs clarifying. Do not invent a misconception or a problem
+  to fill this field; null is a normal, expected answer.
+- next_step: exactly one concrete action or question the learner can do or look into in about five
+  minutes (under {NEXT_STEP_MAX_CHARS} characters). kind is "task" (something to do) or "question"
+  (something to find out).
+- supporting_evidence: up to {MAX_SUPPORTING_EVIDENCE} short points from the notes that support the
+  takeaway or the clarification, each with section_refs. Empty list if none are needed.
+- general_explanations: up to {MAX_GENERAL_EXPLANATIONS} pieces of background from your general
+  knowledge that are NOT in the notes and that the takeaway or clarification depends on. Empty list
+  if none are needed.
+
+Do not add urgency, scores, ratings or encouragement.
 
 section_refs rules: use only section numbers that exist. Cite a section only if its text supports
 the statement. Use an empty list for statements not grounded in a specific section."""
@@ -62,16 +77,14 @@ def _list_of(properties: dict) -> dict:
     return {"type": "array", "items": _obj(properties)}
 
 
+_GROUNDED = {"text": {"type": "string"}, "section_refs": _REF_LIST}
+
 REVIEW_SCHEMA = _obj({
-    "summary": {"type": "string"},
-    "observations": _list_of({"text": {"type": "string"}, "section_refs": _REF_LIST}),
-    "interpretations": _list_of({"text": {"type": "string"}, "section_refs": _REF_LIST}),
-    "possible_gaps": _list_of({"hypothesis": {"type": "string"}, "how_to_check": {"type": "string"},
-                               "section_refs": _REF_LIST}),
+    "main_takeaway": _obj(_GROUNDED),
+    "clarification": {"anyOf": [_obj(_GROUNDED), {"type": "null"}]},
+    "next_step": _obj({"kind": {"type": "string", "enum": ["question", "task"]}, "text": {"type": "string"}}),
+    "supporting_evidence": _list_of(_GROUNDED),
     "general_explanations": _list_of({"topic": {"type": "string"}, "explanation": {"type": "string"}}),
-    "suggested_experiments": _list_of({"text": {"type": "string"}, "section_refs": _REF_LIST}),
-    "suggested_next_steps": _list_of({"kind": {"type": "string", "enum": ["question", "task"]},
-                                      "text": {"type": "string"}}),
 })
 
 
@@ -82,6 +95,29 @@ class Strict(BaseModel):
 class GroundedItem(Strict):
     text: str
     section_refs: list[int]
+
+
+def _short_text(value: str, limit: int, what: str) -> str:
+    value = value.strip()
+    if not value:
+        raise ValueError(f"{what} is empty")
+    if len(value) > limit:
+        raise ValueError(f"{what} is {len(value)} characters; the limit is {limit}")
+    return value
+
+
+class Takeaway(GroundedItem):
+    @field_validator("text")
+    @classmethod
+    def short(cls, v: str) -> str:
+        return _short_text(v, TAKEAWAY_MAX_CHARS, "main_takeaway")
+
+
+class Clarification(GroundedItem):
+    @field_validator("text")
+    @classmethod
+    def short(cls, v: str) -> str:
+        return _short_text(v, CLARIFICATION_MAX_CHARS, "clarification")
 
 
 class Gap(Strict):
@@ -100,7 +136,43 @@ class NextStep(Strict):
     text: str
 
 
+class FocusedNextStep(NextStep):
+    @field_validator("text")
+    @classmethod
+    def short(cls, v: str) -> str:
+        return _short_text(v, NEXT_STEP_MAX_CHARS, "next_step")
+
+
 class Review(Strict):
+    """The current (review-v2) format: one takeaway, at most one clarification, one next step."""
+    main_takeaway: Takeaway
+    clarification: Clarification | None
+    next_step: FocusedNextStep
+    supporting_evidence: list[GroundedItem]
+    general_explanations: list[GeneralExplanation]
+
+    @field_validator("supporting_evidence")
+    @classmethod
+    def few_points(cls, v: list[GroundedItem]) -> list[GroundedItem]:
+        if len(v) > MAX_SUPPORTING_EVIDENCE:
+            raise ValueError(f"{len(v)} supporting_evidence items; the limit is {MAX_SUPPORTING_EVIDENCE}")
+        return v
+
+    @field_validator("general_explanations")
+    @classmethod
+    def few_explanations(cls, v: list[GeneralExplanation]) -> list[GeneralExplanation]:
+        if len(v) > MAX_GENERAL_EXPLANATIONS:
+            raise ValueError(f"{len(v)} general_explanations; the limit is {MAX_GENERAL_EXPLANATIONS}")
+        return v
+
+    def all_refs(self) -> list[int]:
+        items = [self.main_takeaway, *([self.clarification] if self.clarification else []),
+                 *self.supporting_evidence]
+        return [r for item in items for r in item.section_refs]
+
+
+class ReviewV1(Strict):
+    """The original review-v1 format. Only used to read reviews stored before review-v2."""
     summary: str
     observations: list[GroundedItem]
     interpretations: list[GroundedItem]
@@ -112,6 +184,13 @@ class Review(Strict):
     def all_refs(self) -> list[int]:
         items = [*self.observations, *self.interpretations, *self.possible_gaps, *self.suggested_experiments]
         return [r for item in items for r in item.section_refs]
+
+
+def parse_stored_review(prompt_version: str, parsed_json: str) -> Review | ReviewV1:
+    """Read a stored review in whichever format it was written. No model call is involved."""
+    if prompt_version == "review-v1":
+        return ReviewV1.model_validate_json(parsed_json)
+    return Review.model_validate_json(parsed_json)
 
 
 # ---------------------------------------------------------------- questions

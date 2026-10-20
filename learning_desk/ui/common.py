@@ -55,36 +55,42 @@ def inspect_call(call: dict) -> None:
     """The 'Inspect AI call' panel: what the app sent and received, nothing invented."""
     label = f"Inspect AI call #{call['id']} ({call['action']}, {call['status']})"
     with st.expander(label):
-        st.caption("This shows the application's input and output for this call. "
-                   "It does not show the model's internal reasoning.")
-        usage = "not reported"
-        if call["input_tokens"] is not None or call["output_tokens"] is not None:
-            usage = f"{call['input_tokens']} input / {call['output_tokens']} output (reported by provider)"
-        rows = [
-            ("Action", call["action"]),
-            ("Instruction version", call["prompt_version"]),
-            ("Status", call["status"]),
-            ("Time", fmt_time(call["created_at"])),
-            ("Requested model", call["requested_model"]),
-            ("Returned model", call["returned_model"] or "not returned"),
-            ("Elapsed", f"{call['elapsed_ms'] / 1000:.1f} s" if call["elapsed_ms"] is not None else "-"),
-            ("Tokens", usage),
-            ("Stop reason", call["stop_reason"] or "-"),
-            ("Session snapshot", f"#{call['snapshot_id']}"),
-        ]
-        st.table({"Field": [r[0] for r in rows], "Value": [str(r[1]) for r in rows]})
-        if call["error"]:
-            st.error(call["error"])
-        if call["warnings_json"]:
-            for w in json.loads(call["warnings_json"]):
-                st.warning(w)
-        st.markdown("**Request sent** (credentials are never included)")
-        st.code(call["request_json"] or "", language="json", wrap_lines=True)
-        st.markdown("**Raw response**")
-        st.code(call["raw_response"] or "(no response received)", language="json", wrap_lines=True)
-        if call["usage_json"]:
-            st.markdown("**Usage as reported by the provider**")
-            st.code(call["usage_json"], language="json")
+        call_details(call)
+
+
+def call_details(call: dict) -> None:
+    """The body of the inspect panel, for use inside a container that is already collapsible
+    (Streamlit does not allow an expander inside another expander)."""
+    st.caption("This shows the application's input and output for this call. "
+               "It does not show the model's internal reasoning.")
+    usage = "not reported"
+    if call["input_tokens"] is not None or call["output_tokens"] is not None:
+        usage = f"{call['input_tokens']} input / {call['output_tokens']} output (reported by provider)"
+    rows = [
+        ("Action", call["action"]),
+        ("Instruction version", call["prompt_version"]),
+        ("Status", call["status"]),
+        ("Time", fmt_time(call["created_at"])),
+        ("Requested model", call["requested_model"]),
+        ("Returned model", call["returned_model"] or "not returned"),
+        ("Elapsed", f"{call['elapsed_ms'] / 1000:.1f} s" if call["elapsed_ms"] is not None else "-"),
+        ("Tokens", usage),
+        ("Stop reason", call["stop_reason"] or "-"),
+        ("Session snapshot", f"#{call['snapshot_id']}"),
+    ]
+    st.table({"Field": [r[0] for r in rows], "Value": [str(r[1]) for r in rows]})
+    if call["error"]:
+        st.error(call["error"])
+    if call["warnings_json"]:
+        for w in json.loads(call["warnings_json"]):
+            st.warning(w)
+    st.markdown("**Request sent** (credentials are never included)")
+    st.code(call["request_json"] or "", language="json", wrap_lines=True)
+    st.markdown("**Raw response**")
+    st.code(call["raw_response"] or "(no response received)", language="json", wrap_lines=True)
+    if call["usage_json"]:
+        st.markdown("**Usage as reported by the provider**")
+        st.code(call["usage_json"], language="json")
 
 
 def queue_item_row(item: dict, ctx: str, show_session: bool) -> None:

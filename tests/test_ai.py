@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from learning_desk import ai, db, provider
+from learning_desk import ai, db, prompts, provider
 
-from conftest import FEEDBACK_OK, QUESTIONS_OK, REVIEW_OK, make_session
+from conftest import FEEDBACK_OK, QUESTIONS_OK, REVIEW_OK, REVIEW_V1_OK, make_session, store_v1_review
 
 
 def test_review_is_stored_with_its_snapshot(fake):
@@ -52,9 +52,14 @@ def test_same_content_reuses_one_snapshot(fake):
 
 @pytest.mark.parametrize("bad_reply", [
     "not json at all",
-    json.dumps({**REVIEW_OK, "summary": None}),
+    json.dumps({**REVIEW_OK, "main_takeaway": None}),
     json.dumps({**REVIEW_OK, "extra_field": "x"}),
-    json.dumps({k: v for k, v in REVIEW_OK.items() if k != "possible_gaps"}),
+    json.dumps({k: v for k, v in REVIEW_OK.items() if k != "clarification"}),  # must be present, even if null
+    json.dumps({**REVIEW_OK, "main_takeaway": {"text": "x" * 401, "section_refs": []}}),
+    json.dumps({**REVIEW_OK, "clarification": {"text": "  ", "section_refs": []}}),
+    json.dumps({**REVIEW_OK, "next_step": [REVIEW_OK["next_step"], REVIEW_OK["next_step"]]}),
+    json.dumps({**REVIEW_OK, "supporting_evidence": REVIEW_OK["supporting_evidence"] * 4}),
+    json.dumps(REVIEW_V1_OK),  # the old long format is no longer accepted for new reviews
 ])
 def test_invalid_reply_is_rejected_and_notes_are_untouched(fake, bad_reply):
     session_id = make_session()
@@ -84,12 +89,38 @@ def test_provider_failure_is_recorded_once_without_retry(fake):
 
 def test_citations_to_missing_sections_are_flagged(fake):
     session_id = make_session()
-    reply = {**REVIEW_OK, "observations": [{"text": "x", "section_refs": [99]}]}
+    reply = {**REVIEW_OK, "main_takeaway": {"text": "x", "section_refs": [99]}}
     fake.reply(reply)
     result = ai.review_session(session_id)
     assert result.ok
     assert result.warnings and "S99" in result.warnings[0]
     assert "S99" in db.get_ai_call(result.call_id)["warnings_json"]
+
+
+def test_review_is_one_call_in_the_concise_format(fake):
+    session_id = make_session()
+    fake.reply({**REVIEW_OK, "clarification": None, "supporting_evidence": [], "general_explanations": []})
+    result = ai.review_session(session_id)
+
+    assert result.ok and result.parsed.clarification is None  # nothing to clarify is a valid answer
+    assert len(fake.requests) == 1  # no second summarising call
+    call = db.get_ai_call(result.call_id)
+    assert call["prompt_version"] == prompts.REVIEW_VERSION == "review-v2"
+    schema = fake.requests[0]["output_config"]["format"]["schema"]
+    assert set(schema["properties"]) == {"main_takeaway", "clarification", "next_step",
+                                         "supporting_evidence", "general_explanations"}
+    assert "Do not invent a misconception" in fake.requests[0]["system"]
+
+
+def test_stored_reviews_of_both_formats_still_parse(fake):
+    session_id = make_session()
+    old = db.get_ai_call(store_v1_review(session_id))
+    fake.reply(REVIEW_OK)
+    new = db.get_ai_call(ai.review_session(session_id).call_id)
+
+    assert isinstance(prompts.parse_stored_review(old["prompt_version"], old["parsed_json"]), prompts.ReviewV1)
+    assert isinstance(prompts.parse_stored_review(new["prompt_version"], new["parsed_json"]), prompts.Review)
+    assert len(fake.requests) == 1  # reading the old review needed no call
 
 
 def test_instructions_and_session_content_are_kept_apart(fake):

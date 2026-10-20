@@ -7,7 +7,7 @@ from streamlit.testing.v1 import AppTest
 
 from learning_desk import ai, db
 
-from conftest import FEEDBACK_OK, QUESTIONS_OK, REVIEW_OK, make_session
+from conftest import FEEDBACK_OK, QUESTIONS_OK, REVIEW_OK, REVIEW_V1_OK, make_session, store_v1_review
 
 APP = str(Path(__file__).resolve().parent.parent / "app.py")
 
@@ -96,21 +96,103 @@ def test_failed_review_saves_first_and_keeps_text(fake):
     assert fake.requests and "new thoughts" in fake.requests[0]["messages"][0]["content"]
 
 
-def test_review_shows_grounded_and_general_parts_separately(fake):
+def _markdown(at: AppTest) -> str:
+    return " ".join(m.value for m in at.markdown)
+
+
+def _expander(at: AppTest, label: str):
+    return next(e for e in at.expander if e.label == label)
+
+
+def test_new_review_shows_focused_view_with_details_collapsed(fake):
     session_id = make_session()
     fake.reply(REVIEW_OK)
     ai.review_session(session_id)
     at = _open_session(session_id)
-    markdown = " ".join(m.value for m in at.markdown)
-    assert "Grounded in your notes" in markdown
-    assert "General explanations from the model" in markdown
-    assert "Possible gaps or misconceptions" in markdown
-    # Suggestions are only offered, not added.
-    assert db.list_queue(session_id=session_id) == []
+    assert not at.exception
+
+    focus = _markdown(at)
+    for heading in ("Main takeaway", "One thing to clarify", "Next step"):
+        assert heading in focus, heading
+    assert REVIEW_OK["main_takeaway"]["text"] in focus
+    for old_list in ("Possible gaps", "Observations you recorded", "Suggested experiments", "Suggested next steps"):
+        assert old_list not in focus, old_list
+    assert not any("older format" in m.value for m in at.markdown)
+    # Citations sit beside the takeaway and the clarification.
+    labels = [e.label for e in at.expander]
+    assert "Cited: S3" in labels and "Cited: S2, S3" in labels
+    # Supporting evidence and technical details are in collapsed sections.
+    evidence = " ".join(m.value for m in _expander(at, "Supporting evidence").markdown)
+    assert REVIEW_OK["supporting_evidence"][0]["text"] in evidence
+    assert "From the model's general knowledge" in evidence
+    technical = _expander(at, "Technical details")
+    assert any("Raw response" in m.value for m in technical.markdown)
+    assert len(fake.requests) == 1
+
+
+def test_clarification_is_left_out_when_there_is_none(fake):
+    session_id = make_session()
+    fake.reply({**REVIEW_OK, "clarification": None})
+    ai.review_session(session_id)
+    at = _open_session(session_id)
+    assert not at.exception
+    assert "One thing to clarify" not in _markdown(at)
+    assert "Main takeaway" in _markdown(at) and "Next step" in _markdown(at)
+
+
+def test_next_step_is_saved_to_queue_only_on_click(fake):
+    session_id = make_session()
+    fake.reply(REVIEW_OK)
+    ai.review_session(session_id)
+    at = _open_session(session_id)
+    assert db.list_queue(session_id=session_id) == []  # nothing added automatically
+
+    _button(at, "Save to my queue").click()
+    at.run()
+    [item] = db.list_queue(session_id=session_id)
+    assert item["text"] == REVIEW_OK["next_step"]["text"] and item["kind"] == "task"
+    assert item["priority"] == "normal" and item["source"] == "ai_suggestion:next_step"
+    assert not any(b.label == "Save to my queue" for b in at.button)  # cannot be added twice
+    at.run()
+    assert len(db.list_queue(session_id=session_id)) == 1
+    assert len(fake.requests) == 1
+
+
+def test_old_format_review_still_opens(fake):
+    session_id = make_session()
+    store_v1_review(session_id)
+    at = _open_session(session_id)
+    assert not at.exception
+    assert any("older format" in m.value for m in at.markdown)
+    assert REVIEW_V1_OK["summary"] in _markdown(at)
+    evidence = " ".join(m.value for m in _expander(at, "Supporting evidence").markdown)
+    assert "Possible gaps or misconceptions" in evidence
+    # Its suggested next steps can still be added, one click each.
     _button(at, "Add").click()
     at.run()
     [item] = db.list_queue(session_id=session_id)
-    assert item["source"] == "ai_suggestion:0" and item["text"] == REVIEW_OK["suggested_next_steps"][0]["text"]
+    assert item["source"] == "ai_suggestion:0" and item["text"] == REVIEW_V1_OK["suggested_next_steps"][0]["text"]
+    assert fake.requests == []
+
+
+def test_history_and_comparison_make_no_model_calls(fake):
+    session_id = make_session()
+    store_v1_review(session_id)
+    fake.reply(REVIEW_OK)
+    ai.review_session(session_id)
+    at = _open_session(session_id)
+    assert REVIEW_OK["main_takeaway"]["text"] in _markdown(at)  # newest is shown first
+
+    older = db.list_ai_calls(session_id, action="review", status="ok")[1]["id"]
+    next(s for s in at.selectbox if s.label == "Review shown above").set_value(older)
+    at.run()
+    assert not at.exception
+    assert REVIEW_V1_OK["summary"] in _markdown(at)
+
+    next(t for t in at.toggle if t.label == "Compare two reviews side by side").set_value(True)
+    at.run()
+    assert not at.exception
+    assert len(fake.requests) == 1  # only the review created above
 
 
 def test_feedback_button_locked_until_answer_submitted(fake):

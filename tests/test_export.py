@@ -2,7 +2,7 @@ import json
 
 from learning_desk import ai, db, example, export
 
-from conftest import FEEDBACK_OK, QUESTIONS_OK, REVIEW_OK, make_session
+from conftest import FEEDBACK_OK, QUESTIONS_OK, REVIEW_OK, REVIEW_V1_OK, make_session, store_v1_review
 
 
 def test_session_markdown_contains_notes_feedback_and_questions(fake):
@@ -19,10 +19,20 @@ def test_session_markdown_contains_notes_feedback_and_questions(fake):
 
     md = export.session_markdown(session_id)
     for expected in ["# Context windows", "My unique note text", "Unique queue question",
-                     REVIEW_OK["summary"], "General explanations from the model (not from my notes)",
+                     REVIEW_OK["main_takeaway"]["text"], REVIEW_OK["next_step"]["text"],
+                     "General explanations from the model (not from my notes)",
                      "(notes: S2, S3)", QUESTIONS_OK["questions"][1]["question"], "My unique answer",
                      FEEDBACK_OK["follow_up_exercise"], "_(not answered)_"]:
         assert expected in md, expected
+
+
+def test_old_format_reviews_are_exported(fake):
+    session_id = make_session()
+    store_v1_review(session_id)
+    md = export.session_markdown(session_id)
+    assert "review-v1, older format" in md
+    assert REVIEW_V1_OK["summary"] in md and "Possible gaps (hypotheses)" in md
+    assert fake.requests == []
 
 
 def test_json_export_contains_every_table(fake):
