@@ -166,3 +166,7 @@ the model, not the model itself, and they never contact Anthropic.
 3. **Change how notes are numbered.** In `sections.split_blocks`, also start a new block at every
    Markdown heading (a line starting with `#`). Add a test to `tests/test_storage.py`, then look at
    how the `[S#]` sections change in *Inspect AI call*.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
