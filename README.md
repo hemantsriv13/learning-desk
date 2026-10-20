@@ -9,7 +9,7 @@ Start session → capture notes → request AI feedback → answer questions →
 
 ## Setup and launch
 
-Requires Python 3.10 or newer.
+Requires Python 3.11 or newer.
 
 **Windows (PowerShell)**
 
@@ -142,7 +142,7 @@ All tests use a temporary database and a **fake** provider. They check the app's
 the model, not the model itself, and they never contact Anthropic.
 
 GitHub Actions runs the same tests on every push to `main` and on every pull request
-(Ubuntu and Windows, Python 3.10 and 3.14; see `.github/workflows/tests.yml`). The badge at the
+(Ubuntu and Windows, Python 3.11 and 3.14; see `.github/workflows/tests.yml`). The badge at the
 top of this file shows the latest result. CI has no API key and needs none.
 
 ## Key files
