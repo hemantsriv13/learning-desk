@@ -1,5 +1,7 @@
 # Learning Desk
 
+[![Tests](https://github.com/hemantsriv13/learning-desk/actions/workflows/tests.yml/badge.svg)](https://github.com/hemantsriv13/learning-desk/actions/workflows/tests.yml)
+
 A local notebook for an AI learning journey. Capture a session, ask a model to review it,
 answer understanding questions, and keep a queue of what to revisit.
 
@@ -138,6 +140,10 @@ wrong. Everything else is ordinary, deterministic software.
 
 All tests use a temporary database and a **fake** provider. They check the app's behaviour around
 the model, not the model itself, and they never contact Anthropic.
+
+GitHub Actions runs the same tests on every push to `main` and on every pull request
+(Ubuntu and Windows, Python 3.10 and 3.14; see `.github/workflows/tests.yml`). The badge at the
+top of this file shows the latest result. CI has no API key and needs none.
 
 ## Key files
 
