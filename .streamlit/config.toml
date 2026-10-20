@@ -12,5 +12,9 @@ serverAddress = "localhost"
 toolbarMode = "minimal"
 
 [theme]
-# Muted accent instead of Streamlit's default red.
-primaryColor = "#4F7CAC"
+# Dark, low-glare theme with a muted blue accent instead of Streamlit's default red.
+base = "dark"
+primaryColor = "#3E6A99"
+backgroundColor = "#15181D"
+secondaryBackgroundColor = "#1F242B"
+textColor = "#E2E5E9"
