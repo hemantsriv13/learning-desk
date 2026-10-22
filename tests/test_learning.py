@@ -31,7 +31,7 @@ def test_legacy_migration_rehearsed_and_preserves_rows(tmp_path):
         conn.execute(
             "INSERT INTO sessions(id,title,created_at,updated_at) VALUES(42,'Old notes','then','then')"
         )
-    from learning_desk.migrations import migrate
+    from learning_desk.migrations import VERSION, migrate
 
     migrate(path)
     with sqlite3.connect(path) as conn:
@@ -39,7 +39,7 @@ def test_legacy_migration_rehearsed_and_preserves_rows(tmp_path):
             conn.execute("SELECT title FROM sessions WHERE id=42").fetchone()[0]
             == "Old notes"
         )
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == VERSION
     assert path.with_name(path.name + ".pre-learning-v1.bak").exists()
     assert not path.with_name(path.name + ".migration-check").exists()
     migrate(path)

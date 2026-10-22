@@ -142,6 +142,25 @@ def settings() -> None:
 - Instruction versions in use: `{prompts.REVIEW_VERSION}`, `{prompts.QUESTIONS_VERSION}`, `{prompts.FEEDBACK_VERSION}`.
 """)
 
+    st.subheader("Lessons, sources and visuals")
+    from .. import curriculum
+
+    checked = sorted({s.checked for s in curriculum.SOURCES.values() if s.checked})
+    unverified = [s for s in curriculum.SOURCES.values() if not s.checked]
+    st.markdown(f"""
+- **{len(curriculum.LESSONS)} built-in lessons** and {len(curriculum.OUTLINES)} planned outlines. Lesson text is
+  original educational content shipped with the app; opening a lesson never calls a model.
+- **Sources**: {len(curriculum.SOURCES)} references (official documentation, standards, provider documentation and
+  research papers). Links and the claims cited from them were checked on {", ".join(checked) or "—"}.
+  {"Unverified links: " + str(len(unverified)) + "." if unverified else "No unverified links."}
+  Provider documentation changes often; each lesson marks provider-specific details.
+- **Visuals**: every diagram and chart is original, drawn by `learning_desk/visuals.py` and covered by this
+  repository's MIT licence. No photographs, stock images, hotlinked assets or AI-generated images are used.
+  Illustrative data (toy embeddings, invented scores, latency rates) is labelled beside each visual.
+- **Personalised explanations** exist only if you save a lesson to the Library and press a generate button there;
+  they are labelled as AI output and tied to the saved lesson version.
+""")
+
     st.subheader("Example session")
     st.write("Creates a clearly labelled fictional session so you can try the workflow.")
     if st.button("Load fictional example session"):

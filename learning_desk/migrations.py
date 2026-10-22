@@ -1,10 +1,10 @@
-"""Versioned, additive learning-environment migration. Rehearsed before live changes."""
+"""Versioned, additive migrations. All pending steps are rehearsed on a copy before live changes."""
 
 import sqlite3
 from contextlib import closing
 from pathlib import Path
 
-VERSION = 1
+VERSION = 2
 
 
 def apply(conn):
@@ -132,28 +132,63 @@ CREATE TABLE quiz_progress (
                     "legacy saved answer; earlier submissions unavailable",
                 ),
             )
-    conn.execute(f"PRAGMA user_version={VERSION}")
+    conn.execute("PRAGMA user_version=1")
     errors = conn.execute("PRAGMA foreign_key_check").fetchall()
     if errors:
         raise RuntimeError(f"Migration foreign key check failed: {errors}")
     conn.commit()
 
 
+def apply_v2(conn):
+    """Curriculum progress. Additive only: new tables and one nullable column."""
+    conn.execute("BEGIN IMMEDIATE")
+    # Lessons are identified by text ids, so lesson activity stores its id in target_key.
+    conn.execute("ALTER TABLE activity ADD COLUMN target_key TEXT")
+    script = """
+CREATE TABLE lesson_progress (
+ id INTEGER PRIMARY KEY, lesson_id TEXT NOT NULL UNIQUE, lesson_version TEXT NOT NULL,
+ view TEXT NOT NULL DEFAULT 'Overview', section TEXT NOT NULL DEFAULT '',
+ status TEXT NOT NULL DEFAULT 'started' CHECK (status IN ('started', 'completed')),
+ started_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT);
+CREATE TABLE lesson_notes (
+ id INTEGER PRIMARY KEY, lesson_id TEXT NOT NULL UNIQUE, text TEXT NOT NULL DEFAULT '',
+ lesson_version TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE lesson_check_attempts (
+ id INTEGER PRIMARY KEY, lesson_id TEXT NOT NULL, lesson_version TEXT NOT NULL, check_id TEXT NOT NULL,
+ answer TEXT NOT NULL, correct INTEGER NOT NULL CHECK (correct IN (0, 1)), created_at TEXT NOT NULL);
+CREATE INDEX lesson_check_attempts_lookup ON lesson_check_attempts(lesson_id, check_id);
+"""
+    for statement in script.split(";"):
+        if statement.strip():
+            conn.execute(statement)
+    conn.execute("PRAGMA user_version=2")
+    errors = conn.execute("PRAGMA foreign_key_check").fetchall()
+    if errors:
+        raise RuntimeError(f"Migration foreign key check failed: {errors}")
+    conn.commit()
+
+
+def _steps():
+    # Looked up at call time so tests can substitute a failing step.
+    return [(1, apply), (2, apply_v2)]
+
+
 def migrate(path):
     path = Path(path)
     with closing(sqlite3.connect(path)) as src:
-        if src.execute("PRAGMA user_version").fetchone()[0] >= VERSION:
+        current = src.execute("PRAGMA user_version").fetchone()[0]
+        pending = [(version, step) for version, step in _steps() if version > current]
+        if not pending:
             return
-        # SQLite backup includes committed WAL data. Both files stay beside the DB.
-        backup = path.with_name(path.name + ".pre-learning-v1.bak")
+        # One backup of the state before this upgrade, named after the first pending version.
+        # SQLite backup includes committed WAL data. Earlier backups are never overwritten.
+        first = pending[0][0]
+        backup = path.with_name(f"{path.name}.pre-learning-v{first}.bak")
         if backup.exists():
             from datetime import datetime
 
             backup = path.with_name(
-                path.name
-                + ".pre-learning-v1-"
-                + datetime.now().strftime("%Y%m%d%H%M%S%f")
-                + ".bak"
+                f"{path.name}.pre-learning-v{first}-{datetime.now().strftime('%Y%m%d%H%M%S%f')}.bak"
             )
         with closing(sqlite3.connect(backup)) as dest:
             src.backup(dest)
@@ -161,9 +196,11 @@ def migrate(path):
         try:
             with closing(sqlite3.connect(rehearsal)) as test:
                 src.backup(test)
-                apply(test)
+                for _, step in pending:
+                    step(test)
                 if test.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                     raise RuntimeError("Migration integrity check failed")
-            apply(src)
+            for _, step in pending:
+                step(src)
         finally:
             rehearsal.unlink(missing_ok=True)

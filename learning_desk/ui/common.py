@@ -22,6 +22,19 @@ def safe_md(text: str) -> str:
     return re.sub(r"!\[", r"\\![", text or "")
 
 
+def go(page: str, **query) -> None:
+    """Switch page inside the full app. When a page runs alone (headless tests), rerun instead."""
+    if page in PAGES:
+        st.switch_page(PAGES[page], query_params=query or None)
+    st.rerun()
+
+
+def open_lesson(lesson_id: str) -> None:
+    db.set_activity("lesson", 0, key=lesson_id)
+    st.session_state["lesson_id"] = lesson_id
+    go("lesson", id=lesson_id)
+
+
 def open_session(session_id: int) -> None:
     db.set_activity("session", session_id)
     st.session_state["current_session_id"] = session_id
