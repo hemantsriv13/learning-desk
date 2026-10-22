@@ -23,6 +23,7 @@ def safe_md(text: str) -> str:
 
 
 def open_session(session_id: int) -> None:
+    db.set_activity("session", session_id)
     st.session_state["current_session_id"] = session_id
     st.switch_page(PAGES["session"])
 
@@ -87,7 +88,16 @@ def call_details(call: dict) -> None:
     st.markdown("**Request sent** (credentials are never included)")
     st.code(call["request_json"] or "", language="json", wrap_lines=True)
     st.markdown("**Raw response**")
-    st.code(call["raw_response"] or "(no response received)", language="json", wrap_lines=True)
+    # Quiz generation records contain answer keys. Keep those hidden until completion,
+    # including when the record is opened from the reader's general call history.
+    hide_keys=False
+    if call['action']=='quiz':
+        progress=db.query('SELECT p.finished FROM question_sets qs LEFT JOIN quiz_progress p ON p.set_id=qs.id WHERE qs.ai_call_id=?',(call['id'],))
+        hide_keys=not progress or not progress[0]['finished']
+    if hide_keys:
+        st.caption('Generation response contains answer keys and is hidden until this quiz is finished. Complete records remain available in archival exports.')
+    else:
+        st.code(call["raw_response"] or "(no response received)", language="json", wrap_lines=True)
     if call["usage_json"]:
         st.markdown("**Usage as reported by the provider**")
         st.code(call["usage_json"], language="json")

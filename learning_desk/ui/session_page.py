@@ -388,7 +388,20 @@ def _render_plain(call: dict) -> None:
 
 
 def _test_tab(session: dict) -> None:
-    sets = db.list_question_sets(session["id"])
+    from .practice import quiz_setup, open_quiz
+    quiz_setup(session_id=session['id'], before_generate=lambda: _save_if_dirty(session))
+    for qs in db.list_question_sets(session['id']):
+        call = db.get_ai_call(qs['ai_call_id'])
+        if call['action'] == 'quiz':
+            if st.button(f"Open saved quiz {qs['id']} | {qs['created_at']}"):
+                open_quiz(qs['id'])
+    with st.expander('Earlier notebook question format'):
+        _legacy_test_tab(session)
+
+
+def _legacy_test_tab(session: dict) -> None:
+    sets = [qs for qs in db.list_question_sets(session["id"])
+            if db.get_ai_call(qs['ai_call_id'])['action'] != 'quiz']
     ai_privacy_note("the saved version of this session")
     label = "Generate a new set of questions" if sets else "Generate three questions"
     if st.button(label, type="primary", disabled=not ai_ready()):
@@ -410,8 +423,15 @@ def _test_tab(session: dict) -> None:
     chosen = st.selectbox("Question set", list(labels), format_func=labels.get)
     qset = next(s for s in sets if s["id"] == chosen)
     st.caption("Questions only: no answers or hints were requested. Write your own answer first.")
-    for q in qset["questions"]:
-        _question_block(session, q)
+    db.execute('INSERT OR IGNORE INTO quiz_progress(set_id) VALUES(?)', (qset['id'],))
+    progress = db.query('SELECT * FROM quiz_progress WHERE set_id=?', (qset['id'],))[0]
+    pos = min(progress['position'], len(qset['questions'])-1)
+    st.caption(f"Question {pos+1} of {len(qset['questions'])}")
+    _question_block(session, qset['questions'][pos])
+    if st.button('Next question' if pos<len(qset['questions'])-1 else 'Back to first question'):
+        db.execute('UPDATE quiz_progress SET position=? WHERE set_id=?', ((pos+1)%len(qset['questions']),qset['id']))
+        db.set_activity('quiz',qset['id'])
+        st.rerun()
     inspect_call(db.get_ai_call(qset["ai_call_id"]))
 
 
@@ -459,7 +479,16 @@ def _question_block(session: dict, q: dict) -> None:
         calls = db.list_ai_calls(session["id"], action="answer_feedback", question_id=q["id"])
         ok_calls = [c for c in calls if c["status"] == "ok"]
         if ok_calls:
-            _render_feedback(q, ok_calls[0])
+            chosen_call=st.selectbox('Feedback record', [c['id'] for c in ok_calls],
+                                     format_func=lambda i: next(f"{c['created_at']} | attempt {c['attempt_id'] or 'unrecoverable'}" for c in ok_calls if c['id']==i),key=f"feedback_record_{q['id']}")
+            _render_feedback(q, next(c for c in ok_calls if c['id']==chosen_call))
+        with st.expander('Submitted answer history'):
+            from .practice import attempt_history
+            qs=db.query('SELECT * FROM question_sets WHERE id=?',(q['set_id'],))[0]
+            attempt_history(q,qs)
+        from .practice import report
+        history=db.attempts(q['id'])
+        report(q['id'],history[-1]['id'] if history else None)
         for c in calls:
             if c["status"] == "error":
                 inspect_call(c)
@@ -474,6 +503,13 @@ def _render_feedback(q: dict, call: dict) -> None:
         sent_text = json.loads(call["request_json"])["messages"][0]["content"]
         if f"<answer>\n{q['answer']}\n</answer>" not in sent_text:
             st.caption("You edited your answer after this feedback was written.")
+        if call.get('attempt_id'):
+            evaluated = db.query('SELECT * FROM answer_attempts WHERE id=?', (call['attempt_id'],))
+            if evaluated:
+                st.caption(f"Evaluated attempt {call['attempt_id']}")
+                st.text(evaluated[0]['answer'])
+        else:
+            st.caption('Historical answer association could not be reconstructed from stored records.')
         st.caption("A second opinion, not a grade. The model can be wrong.")
         st.markdown("**What your answer explains well**")
         st.markdown(safe_md("\n".join(f"- {p}" for p in fb.explains_well) or "_Nothing identified._"))

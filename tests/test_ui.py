@@ -255,7 +255,7 @@ def test_feedback_button_locked_until_answer_submitted(fake):
     ai.generate_questions(session_id)
     at = _open_session(session_id)
     feedback_buttons = [b for b in at.button if b.label == "Get feedback on my answer"]
-    assert len(feedback_buttons) == 3 and all(b.disabled for b in feedback_buttons)
+    assert len(feedback_buttons) == 1 and all(b.disabled for b in feedback_buttons)
     assert not any("Explains well" in m.value for m in at.markdown)
 
     _text_area(at, "Your answer").input("Because each request is independent.")

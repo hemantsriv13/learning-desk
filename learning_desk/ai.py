@@ -46,12 +46,15 @@ def _session_block(content: dict, numbered: list[dict]) -> str:
 
 
 def _run(*, action: str, version: str, instructions: str, schema: dict, model_cls: type[BaseModel],
-         session_id: int, snapshot_id: int, user_text: str, question_id: int | None = None) -> AIResult:
+         session_id: int | None, snapshot_id: int | None, user_text: str, question_id: int | None = None,
+         content_version_id: int | None = None, attempt_id: int | None = None, validate=None) -> AIResult:
     request = provider.build_request(system=instructions, user_text=user_text, schema=schema)
     record = {
         "session_id": session_id,
         "snapshot_id": snapshot_id,
         "question_id": question_id,
+        "content_version_id": content_version_id,
+        "attempt_id": attempt_id,
         "action": action,
         "prompt_version": version,
         "requested_model": request["model"],
@@ -70,7 +73,9 @@ def _run(*, action: str, version: str, instructions: str, schema: dict, model_cl
 
     try:
         parsed = model_cls.model_validate(json.loads(response.text))
-    except (json.JSONDecodeError, ValidationError) as e:
+        if validate:
+            validate(parsed)
+    except (ValueError, ValidationError) as e:
         return _fail(record, started, "The model's reply did not match the expected format, so it was "
                                       f"not used. Your notes are unchanged. Details: {e}")
 
@@ -142,14 +147,30 @@ def answer_feedback(question_id: int) -> AIResult:
     if not question["answer"].strip():
         raise ValueError("Save an answer before asking for feedback")
     session_id = db.session_id_for_question(question_id)
-    snapshot_id, content, numbered = prepare_snapshot(session_id)
+    qset = db.query('SELECT * FROM question_sets WHERE id=?', (question['set_id'],))[0]
+    snapshot_id = qset['snapshot_id']
+    snapshot = db.get_snapshot(snapshot_id)
+    if not snapshot:
+        raise ValueError('The original question snapshot is unavailable; feedback cannot be grounded.')
+    content = snapshot['content']
+    numbered = content['sections']
+    history = db.attempts(question_id)
+    attempt_id = history[-1]['id'] if history else db.submit_attempt(question_id, question['answer'])
+    evaluated = db.query('SELECT * FROM answer_attempts WHERE id=?', (attempt_id,))[0]
+    previous = db.query("SELECT * FROM ai_calls WHERE attempt_id=? AND action='answer_feedback' AND status='ok' ORDER BY id DESC", (attempt_id,))
+    if previous:
+        return AIResult(ok=True, call_id=previous[0]['id'], parsed=prompts.AnswerFeedback.model_validate_json(previous[0]['parsed_json']))
     user_text = (f"{_session_block(content, numbered)}\n\n"
                  f"<question kind=\"{question['kind']}\">\n{question['text']}\n</question>\n\n"
-                 f"<answer>\n{question['answer']}\n</answer>")
-    return _run(action="answer_feedback", version=prompts.FEEDBACK_VERSION,
+                 f"<answer>\n{evaluated['answer']}\n</answer>")
+    result = _run(action="answer_feedback", version=prompts.FEEDBACK_VERSION,
                 instructions=prompts.FEEDBACK_INSTRUCTIONS, schema=prompts.FEEDBACK_SCHEMA,
                 model_cls=prompts.AnswerFeedback, session_id=session_id, snapshot_id=snapshot_id,
-                user_text=user_text, question_id=question_id)
+                user_text=user_text, question_id=question_id, attempt_id=attempt_id)
+    if result.ok:
+        db.execute('INSERT INTO attempt_feedback(attempt_id,ai_call_id,feedback_json,created_at) VALUES(?,?,?,?)',
+                   (attempt_id,result.call_id,result.parsed.model_dump_json(),db.now()))
+    return result
 
 
 def _save_warnings(call_id: int, warnings: list[str]) -> None:

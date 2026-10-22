@@ -117,6 +117,8 @@ def connect():
 def init_db() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+    from .migrations import migrate
+    migrate(config.db_path())
 
 
 def _row(row):
@@ -338,14 +340,75 @@ def session_id_for_question(question_id: int) -> int:
 
 
 def save_answer(question_id: int, answer: str) -> None:
-    with connect() as conn:
-        conn.execute("UPDATE questions SET answer = ?, answered_at = ? WHERE id = ?",
-                     (answer, now(), question_id))
+    return submit_attempt(question_id, answer)
 
 
 # ---------- export ----------
 
 def dump_all() -> dict:
-    tables = ["sessions", "queue_items", "snapshots", "ai_calls", "question_sets", "questions"]
+    tables = ["sessions", "queue_items", "snapshots", "ai_calls", "question_sets", "questions", "resources", "content_versions", "resource_sessions", "summaries", "answer_attempts", "attempt_feedback", "issue_reports", "activity", "quiz_progress", "reader_progress"]
     with connect() as conn:
         return {t: _rows(conn.execute(f"SELECT * FROM {t} ORDER BY id").fetchall()) for t in tables}
+
+# ---------- connected learning ----------
+
+def query(sql, params=()):
+    with connect() as conn:
+        return _rows(conn.execute(sql, params).fetchall())
+
+
+def execute(sql, params=()):
+    with connect() as conn:
+        return conn.execute(sql, params).lastrowid
+
+
+def save_resource(title, resource_type='reference', url='', tags='', level='introductory',
+                  status='Saved', resource_id=None, archived=False):
+    if not title.strip():
+        raise ValueError('A title is required')
+    if resource_type not in ('reference', 'documentation', 'article', 'pasted'):
+        raise ValueError('Unknown resource type')
+    if level not in ('introductory', 'intermediate', 'advanced') or status not in ('Saved','Reading','Finished'):
+        raise ValueError('Invalid level or status')
+    values = (title.strip(), url.strip(), resource_type, tags, level, status, int(archived), now())
+    if resource_id:
+        execute('UPDATE resources SET title=?,url=?,resource_type=?,tags=?,level=?,status=?,archived=?,updated_at=? WHERE id=?', values+(resource_id,))
+        return resource_id
+    return execute('INSERT INTO resources(title,url,resource_type,tags,level,status,archived,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?)', values+(now(),))
+
+
+def list_resources(search='', archived=False):
+    return [r for r in query('SELECT * FROM resources WHERE archived=? ORDER BY updated_at DESC,id DESC',(int(archived),))
+            if search.casefold() in ' '.join(str(r[k]) for k in ('title','url','tags','resource_type','level','status')).casefold()]
+
+
+def add_content(resource_id, text, source_url='', import_note='Pasted by learner', links=None):
+    text = text.strip()
+    if not text or len(text)>100000:
+        raise ValueError('Content must contain 1–100,000 characters')
+    digest = hashlib.sha256(text.encode()).hexdigest()
+    rows = query('SELECT id FROM content_versions WHERE resource_id=? AND content_hash=? AND source_url=?',(resource_id,digest,source_url))
+    if rows:
+        return rows[0]['id']
+    return execute('INSERT INTO content_versions(resource_id,text,source_url,import_note,content_hash,created_at,links_json) VALUES(?,?,?,?,?,?,?)',
+                   (resource_id,text,source_url,import_note,digest,now(),json.dumps(links or [])))
+
+
+def set_activity(kind, target_id):
+    if kind not in ('resource','quiz','session'):
+        raise ValueError('Invalid activity')
+    execute('INSERT INTO activity(id,kind,target_id,updated_at) VALUES(1,?,?,?) ON CONFLICT(id) DO UPDATE SET kind=excluded.kind,target_id=excluded.target_id,updated_at=excluded.updated_at', (kind,target_id,now()))
+
+
+def attempts(question_id):
+    return query('SELECT * FROM answer_attempts WHERE question_id=? ORDER BY id',(question_id,))
+
+
+def submit_attempt(question_id, answer):
+    if not answer.strip():
+        raise ValueError('Write or select an answer first')
+    with connect() as conn:
+        attempt_id = conn.execute('INSERT INTO answer_attempts(question_id,answer,created_at) VALUES(?,?,?)', (question_id,answer,now())).lastrowid
+        conn.execute('UPDATE questions SET answer=?,answered_at=? WHERE id=?',(answer,now(),question_id))
+    set_activity('quiz', get_question(question_id)['set_id'])
+    return attempt_id

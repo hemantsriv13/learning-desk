@@ -146,3 +146,11 @@ def settings() -> None:
     st.write("Creates a clearly labelled fictional session so you can try the workflow.")
     if st.button("Load fictional example session"):
         open_session(example.create_example_session())
+
+
+    with st.expander('Reported questions and feedback'):
+        reports=db.query('SELECT * FROM issue_reports ORDER BY id DESC')
+        if reports:
+            st.dataframe(reports,hide_index=True)
+        else:
+            st.caption('No reports saved.')

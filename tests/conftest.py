@@ -11,6 +11,17 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# Keep every test artifact local and never load personal provider configuration.
+import os
+import tempfile
+import dotenv
+_TEST_TEMP = Path(__file__).resolve().parent.parent / '.test-work'
+_TEST_TEMP.mkdir(exist_ok=True)
+for _name in ('TEMP', 'TMP', 'TMPDIR'):
+    os.environ[_name] = str(_TEST_TEMP)
+tempfile.tempdir = str(_TEST_TEMP)
+dotenv.load_dotenv = lambda *args, **kwargs: False
+
 from learning_desk import db, provider  # noqa: E402
 
 

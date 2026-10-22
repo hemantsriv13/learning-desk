@@ -23,3 +23,12 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Repository-local verification environment
+.tools/
+.test-*/
+.test-work/
+
+# SQLite migration backups and rehearsal copies
+*.pre-learning-v*.bak
+*.migration-check
