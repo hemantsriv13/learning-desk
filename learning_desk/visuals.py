@@ -12,19 +12,19 @@ from html import escape
 from typing import Callable
 
 # Palette for the dark theme. Text colours keep at least 7:1 contrast against PANEL.
-PANEL = "#1B2027"
-TEXT = "#E2E5E9"
-MUTED = "#AEB6C1"
-LINE = "#5B6676"
-TONES = {  # (fill, stroke, text)
-    "neutral": ("#232A33", "#4A5563", TEXT),
-    "accent": ("#1E3047", "#8DB8E6", "#CFE2F7"),
+PANEL = "#161513"
+TEXT = "#EBEBE9"
+MUTED = "#B8B4AE"
+LINE = "#6B665F"
+TONES = {  # (fill, stroke, text): warm neutrals, teal as the one data hue, status colours for status only
+    "neutral": ("#211F1D", "#4F4A45", TEXT),
+    "accent": ("#132A30", "#6DB3C4", "#CBE8EF"),
     "ok": ("#1C3A30", "#7FC8A9", "#CBEBDD"),
     "warn": ("#3B3020", "#E0B46A", "#F2DDB5"),
     "bad": ("#3F2329", "#E58A8A", "#F6CFCF"),
-    "quiet": ("#1F242B", "#3A424E", MUTED),
+    "quiet": ("#1C1A18", "#3D3935", MUTED),
 }
-FONT = "Source Sans Pro, Segoe UI, system-ui, sans-serif"
+FONT = "Segoe UI, system-ui, -apple-system, Helvetica, Arial, sans-serif"
 MONO = "Source Code Pro, Consolas, ui-monospace, monospace"
 
 
@@ -500,13 +500,13 @@ def attention_heatmap(highlight="it"):
                 fill = PANEL
             else:
                 level = min(1.0, w * 1.6)
-                fill = f"rgb({int(30 + 111 * level)},{int(42 + 142 * level)},{int(58 + 172 * level)})"
-            stroke = TONES["accent"][1] if i == row else "#2A313B"
+                fill = f"rgb({int(31 + 78 * level)},{int(29 + 150 * level)},{int(27 + 169 * level)})"  # warm black to teal
+            stroke = TONES["accent"][1] if i == row else "#2B2826"
             body.append(f'<rect x="{left + j * cell}" y="{y}" width="{cell - 2}" height="{cell - 2}" '
                         f'fill="{fill}" stroke="{stroke}"/>')
             if i == row and j <= i:
                 body.append(_t(left + j * cell + cell / 2 - 1, y + cell / 2 + 4, f"{w:.2f}", 11,
-                               fill="#0E1116" if w > 0.35 else TEXT))
+                               fill="#0E0D0C" if w > 0.35 else TEXT))
     top_j = max(range(n), key=lambda j: weights[row][j])
     return _svg(u, left + n * cell + 20, top + n * cell + 20, "Toy attention heatmap",
                 f"A ten-by-ten grid for the sentence 'The animal didn't cross the street because it was tired'. "

@@ -7,6 +7,7 @@ from learning_desk.ui import common, learn, library, other_pages, session_page, 
 
 st.set_page_config(page_title="Learning Desk", page_icon=":material/menu_book:", layout="wide")
 theme.inject()
+st.logo("static/logo.svg", size="medium")
 db.init_db()
 
 common.PAGES.update(

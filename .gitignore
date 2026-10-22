@@ -32,3 +32,7 @@ Thumbs.db
 # SQLite migration backups and rehearsal copies
 *.pre-learning-v*.bak
 *.migration-check
+
+# Design-skill working files (screenshots, inspector output, demo database)
+.taste-skill/
+.mcp.json

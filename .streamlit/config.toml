@@ -2,6 +2,8 @@
 # Only reachable from this computer.
 address = "localhost"
 port = 8501
+# Serves ./static (the bundled typeface and the logo) so the app needs no font CDN.
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false
@@ -12,13 +14,35 @@ serverAddress = "localhost"
 toolbarMode = "minimal"
 
 [theme]
-# Dark, low-glare theme with a muted blue accent instead of Streamlit's default red.
+# Warm near-black, low-glare reading theme. Elevation is a lightness step (ground #0e0d0c, panels #181716);
+# the one hue is teal and it marks data and progress, never buttons, tabs or navigation.
 base = "dark"
-primaryColor = "#3E6A99"
-backgroundColor = "#15181D"
-secondaryBackgroundColor = "#1F242B"
-textColor = "#E2E5E9"
-# Accents for the one highlighted phrase in a review (soft blue; muted amber for "One thing to
-# clarify"). Both are about 8:1 contrast or better against backgroundColor.
-blueTextColor = "#8DB8E6"
-orangeTextColor = "#E0B46A"
+primaryColor = "#6db3c4"
+backgroundColor = "#0e0d0c"
+secondaryBackgroundColor = "#181716"
+textColor = "#ebebe9"
+linkColor = "#ebebe9"
+borderColor = "#2b2826"
+showWidgetBorder = true
+showSidebarBorder = true
+baseRadius = "14px"
+buttonRadius = "full"
+font = "Hanken Grotesk, system-ui, sans-serif"
+headingFont = "Hanken Grotesk, system-ui, sans-serif"
+headingFontSizes = ["2rem", "1.5rem", "1.25rem"]
+headingFontWeights = [600, 600, 600]
+# Accents for the one highlighted phrase in a review (teal; muted amber for "One thing to clarify").
+# Both are well over 7:1 against backgroundColor.
+blueTextColor = "#86c7d6"
+orangeTextColor = "#e0b46a"
+
+[[theme.fontFaces]]
+# Hanken Grotesk, SIL Open Font License 1.1 (static/fonts/OFL.txt). One variable file, Latin subset.
+family = "Hanken Grotesk"
+url = "app/static/fonts/HankenGrotesk-latin.woff2"
+weight = "400 700"
+style = "normal"
+
+[theme.sidebar]
+backgroundColor = "#0e0d0c"
+secondaryBackgroundColor = "#181716"

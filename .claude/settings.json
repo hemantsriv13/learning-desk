@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y better-design@0.47.0 review --hook"
+          }
+        ]
+      }
+    ]
+  }
+}

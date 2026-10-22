@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "better-design": {
+      "source": "marvkr/better-design",
+      "sourceType": "github",
+      "skillPath": "skills/better-design/SKILL.md",
+      "computedHash": "1cec6f1593b905a5238c7459f28c3a790861a672f8eeb18e00beb22fce8d53f7"
+    },
+    "design-taste-frontend": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/taste-skill/SKILL.md",
+      "computedHash": "65049e1890f5fedf8f8e1144848f07bcda788e51c22bac78afbd073aeb486725"
+    }
+  }
+}

@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learning Desk — study how AI apps work, on your own computer</title>
+<meta name="description" content="A free app for your own computer: fourteen illustrated lessons on how AI apps work, with dated sources and notes that never leave your machine.">
+<link rel="preload" href="assets/fonts/HankenGrotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/site.css">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+
+<main>
+  <section class="hero" id="top" aria-labelledby="hero-title">
+    <div class="hero__stage">
+      <nav class="nav" aria-label="Main">
+        <a class="nav__mark" href="#top">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="11" width="26" height="4" rx="1.5" fill="#256f82"/><rect x="6" y="15" width="3" height="12" rx="1" fill="#256f82"/><rect x="23" y="15" width="3" height="12" rx="1" fill="#256f82"/><rect x="10" y="5" width="12" height="5" rx="1" fill="#0a0a0a"/></svg>
+          Learning Desk
+        </a>
+        <div class="nav__links">
+          <a class="link" href="#lessons">Lessons</a>
+          <a class="link" href="#how">How it works</a>
+          <a class="link" href="#sources">Sources</a>
+        </div>
+        <a class="button button--small" href="https://github.com/hemantsriv13/learning-desk">Get the code</a>
+      </nav>
+
+      <h1 class="hero__sentence" id="hero-title">
+        <span class="hero__a">Study the</span>
+        <span class="sr-only">ideas behind AI apps</span>
+        <span class="hero__inline" aria-hidden="true"><img src="assets/screens/diagram-request-flow.jpg" width="1226" height="958" alt=""></span>
+        <span class="hero__b">at your desk</span>
+      </h1>
+
+      <div class="hero__reel">
+        <div class="reel__track">
+          <figure class="reel__frame"><img src="assets/screens/diagram-retrieval.jpg" width="1226" height="690" alt="Diagram from the retrieval lesson: stage one selects three of six chunks by similarity; stage two writes an answer from only those chunks."></figure>
+          <figure class="reel__frame"><img src="assets/screens/diagram-request-flow.jpg" width="1226" height="958" alt="Diagram from the lesson on HTTP: a request moves from the interface to the backend, the provider API, validation, storage and display, with a failure branch that records the error instead of saving."></figure>
+          <figure class="reel__frame"><img src="assets/screens/diagram-attention.jpg" width="1226" height="1226" loading="lazy" alt="Diagram from the attention lesson: a grid of attention weights for the sentence about an animal that didn't cross the street; the row for 'it' puts most weight on 'animal'."></figure>
+          <figure class="reel__frame"><img src="assets/screens/diagram-embedding.jpg" width="1226" height="640" loading="lazy" alt="Diagram from the embeddings lesson: phrases plotted as points in two dimensions, with animals, payments and code in three directions, labelled as a toy illustration."></figure>
+          <figure class="reel__frame"><img src="assets/screens/diagram-context.jpg" width="1226" height="886" loading="lazy" alt="Diagram from the context lesson: six kinds of stored material on the computer, of which only a numbered snapshot of the current session enters a review request."></figure>
+        </div>
+      </div>
+
+      <p class="hero__support">A free app for your own computer: fourteen illustrated lessons on how AI apps work, with notes that never leave your machine.</p>
+      <a class="button hero__action" href="https://github.com/hemantsriv13/learning-desk">Get the code</a>
+    </div>
+  </section>
+
+  <section class="section wrap" id="lessons" aria-labelledby="lessons-title">
+    <h2 class="list__head" id="lessons-title" data-reveal><span>Ten topics,</span> <span>fourteen lessons</span></h2>
+    <div class="grid list__body">
+      <figure class="list__photo" data-reveal style="--i:2">
+        <img src="assets/found/wooden-card-catalog-furniture.jpg" width="1920" height="1440" loading="lazy" alt="Close view of an oak library card catalogue: rows of small drawers, each with a brass label holder and pull.">
+        <figcaption class="caption">A card catalogue in a public library in Nashua, New Hampshire.</figcaption>
+      </figure>
+      <p class="list__label" data-reveal style="--i:1">Topics</p>
+      <div class="topics" data-reveal style="--i:1">
+        <ul>
+          <li><span class="t-count">1 lesson</span><span class="t-name">Python for AI applications</span><span class="t-plan">3 planned</span></li>
+          <li><span class="t-count">3 lessons</span><span class="t-name">JSON, HTTP, APIs and authentication</span><span class="t-plan">1 planned</span></li>
+          <li><span class="t-count">2 lessons</span><span class="t-name">Tokens, context, training and inference</span><span class="t-plan">1 planned</span></li>
+          <li><span class="t-count">1 lesson</span><span class="t-name">Probability, generation and sampling</span><span class="t-plan">2 planned</span></li>
+          <li><span class="t-count">2 lessons</span><span class="t-name">Embeddings, similarity and retrieval</span><span class="t-plan">1 planned</span></li>
+          <li><span class="t-count">1 lesson</span><span class="t-name">Attention and transformer fundamentals</span><span class="t-plan">2 planned</span></li>
+          <li><span class="t-count">1 lesson</span><span class="t-name">Instructions and structured outputs</span><span class="t-plan">1 planned</span></li>
+          <li><span class="t-count">1 lesson</span><span class="t-name">Tools and agent workflows</span><span class="t-plan">1 planned</span></li>
+          <li><span class="t-count">1 lesson</span><span class="t-name">Evaluation, datasets, graders and failure analysis</span><span class="t-plan">2 planned</span></li>
+          <li><span class="t-count">1 lesson</span><span class="t-name">AI product decisions</span><span class="t-plan">1 planned</span></li>
+        </ul>
+        <p class="topics__note">Planned lessons are shown as outlines and say so. Nothing unfinished is presented as a lesson.</p>
+      </div>
+    </div>
+  </section>
+
+  <figure class="rest" aria-label="A study">
+    <div class="rest__frame">
+      <img src="assets/found/abbotsford-house-study-room.jpg" width="1920" height="1280" loading="lazy" alt="A panelled study lined floor to ceiling with leather-bound books, a gallery railing above, a fireplace, and a writing desk in the middle of the room.">
+    </div>
+    <figcaption class="caption">The study at Abbotsford House, Melrose, Scotland.</figcaption>
+  </figure>
+
+  <section class="showcase" id="views" data-stage="1" aria-labelledby="views-title">
+    <div class="showcase__stage">
+      <h2 class="showcase__title" id="views-title"><span class="sc-a">Four ways into</span> <span class="sc-b">one lesson</span></h2>
+      <div class="showcase__frame">
+        <img src="assets/screens/lesson-portrait.jpg" width="2080" height="2600" loading="lazy" alt="Learning Desk showing the attention lesson in its Try it view: the four view tabs Overview, Walkthrough, Try it and Sources, the activity steps, the attention heatmap, and a side panel with progress, the lesson's contents and the learner's notes.">
+      </div>
+      <p class="showcase__caption">Overview, Walkthrough, Try it and Sources are four views of the same text. The app keeps your view, your section and your notes, on your computer only.</p>
+    </div>
+  </section>
+
+  <section class="section wrap grid live" id="try" aria-labelledby="try-title">
+    <div class="live__text" data-reveal>
+      <h2 id="try-title">Move the temperature</h2>
+      <p>This is the sampling lesson’s own example. A model scores every possible next word; temperature decides how strongly the highest score wins. Drag it, then draw a word.</p>
+      <p class="caption">The eight scores are invented for teaching. The arithmetic is the lesson’s, and it runs in your browser: no model is called.</p>
+    </div>
+    <div class="live__demo" data-reveal style="--i:1">
+      <p class="live__sentence">The experiment finished, so we wrote the <output id="next-word" aria-live="polite">report</output></p>
+      <ul class="bars" aria-label="Probability of each next word">
+        <li style="--w:38.3%"><span>report</span><span class="b-track"><span class="b-fill"></span></span><span class="b-val">38%</span></li>
+        <li style="--w:28.4%"><span>results</span><span class="b-track"><span class="b-fill"></span></span><span class="b-val">28%</span></li>
+        <li style="--w:15.6%"><span>summary</span><span class="b-track"><span class="b-fill"></span></span><span class="b-val">16%</span></li>
+        <li style="--w:8.5%"><span>paper</span><span class="b-track"><span class="b-fill"></span></span><span class="b-val">9%</span></li>
+        <li style="--w:4.7%"><span>code</span><span class="b-track"><span class="b-fill"></span></span><span class="b-val">5%</span></li>
+        <li style="--w:3.1%"><span>email</span><span class="b-track"><span class="b-fill"></span></span><span class="b-val">3%</span></li>
+        <li style="--w:1.2%"><span>poem</span><span class="b-track"><span class="b-fill"></span></span><span class="b-val">1%</span></li>
+        <li style="--w:0.2%"><span>banana</span><span class="b-track"><span class="b-fill"></span></span><span class="b-val">under 1%</span></li>
+      </ul>
+      <div class="live__controls">
+        <div>
+          <label for="temperature">Temperature <output id="temperature-value">1.0</output></label>
+          <input id="temperature" type="range" min="0" max="2.5" step="0.1" value="1">
+        </div>
+        <button class="button" id="draw" type="button">Draw a word</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="section wrap" id="how" aria-labelledby="how-title">
+    <div class="steps">
+      <div class="step" style="--start:1; --n:0" data-reveal>
+        <h2 id="how-title">First, you press a button.</h2>
+        <p>Reading, browsing and switching views send nothing. A model is called only when you ask for a summary, a quiz or a review.</p>
+      </div>
+      <div class="step" style="--start:3; --n:1" data-reveal>
+        <h3>Then one request leaves.</h3>
+        <p>It carries the one saved lesson or note you chose, and nothing else from your desk. One attempt, no silent retries.</p>
+      </div>
+      <div class="step" style="--start:5; --n:2" data-reveal>
+        <h3>The reply is checked.</h3>
+        <p>It must be valid JSON in the expected shape, and every citation must point at a passage that really exists.</p>
+      </div>
+      <figure class="steps__proof" data-ui data-reveal style="--i:2">
+        <div class="app-msg" role="img" aria-label="Learning Desk error message: Review failed. Your notes are unchanged. The model's reply did not match the expected format, so it was not used.">
+          <p class="app-msg__text">Review failed. Your notes are unchanged. The model’s reply did not match the expected format, so it was not used.</p>
+          <p class="app-msg__detail">Details: 1 validation error for Review …</p>
+        </div>
+        <figcaption class="caption">What the app shows when a reply fails its checks. Wording from <code>learning_desk/ai.py</code> and <code>session_page.py</code>; the details line is shortened.</figcaption>
+      </figure>
+      <div class="step step--last" style="--start:7; --n:3" data-reveal>
+        <h3>Or nothing is kept.</h3>
+        <p>A failed or malformed reply is recorded with its reason, and your notes stay exactly as they were.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section wrap proof" id="sources" aria-labelledby="sources-title">
+    <h2 id="sources-title" data-reveal>Every claim has a source</h2>
+    <ul class="names" aria-label="Sources the lessons cite" data-reveal style="--i:1">
+      <li>Python’s own documentation</li>
+      <li>RFC 8259</li>
+      <li>JSON Schema</li>
+      <li>MDN Web Docs</li>
+      <li>OWASP</li>
+      <li>Pydantic</li>
+      <li>Anthropic’s API documentation</li>
+      <li>Building Effective Agents</li>
+      <li>Contextual Retrieval</li>
+      <li>Attention Is All You Need</li>
+      <li>Jointly Learning to Align and Translate</li>
+      <li>Subword Units for Rare Words</li>
+      <li>The Curious Case of Neural Text Degeneration</li>
+      <li>Word Representations in Vector Space</li>
+      <li>Retrieval-Augmented Generation</li>
+      <li>ReAct</li>
+      <li>Judging LLM-as-a-Judge</li>
+      <li>and this app’s own code</li>
+    </ul>
+    <p class="caption" data-reveal style="--i:2">Each link was opened, and the claim it supports compared with the page, on 23 October 2026. Every lesson shows its sources and that date.</p>
+  </section>
+
+  <section class="close" id="start" aria-labelledby="start-title">
+    <h2 id="start-title" data-reveal>Your desk is ready</h2>
+    <div class="close__foot">
+      <p data-reveal style="--i:1">Free and open source under the MIT licence. Clone the repository, then run <code>python -m streamlit run app.py</code>.</p>
+      <a class="button" href="https://github.com/hemantsriv13/learning-desk" data-reveal style="--i:2">Get the code</a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer" aria-labelledby="footer-title">
+  <div class="footer__top">
+    <div class="footer__invite">
+      <h2 id="footer-title">Spotted a wrong claim?</h2>
+      <a class="button" href="https://github.com/hemantsriv13/learning-desk/issues/new">Open an issue</a>
+    </div>
+    <ul class="footer__links" aria-label="Project links">
+      <li><a class="link" href="https://github.com/hemantsriv13/learning-desk">Source code</a></li>
+      <li><a class="link" href="https://github.com/hemantsriv13/learning-desk#readme">README</a></li>
+      <li><a class="link" href="https://github.com/hemantsriv13/learning-desk/blob/main/LICENSE">MIT licence</a></li>
+    </ul>
+  </div>
+  <div></div>
+  <p class="footer__legal">
+    <span>Screenshots show Learning Desk with sample progress and notes. Typeface: Hanken Grotesk, SIL Open Font License.</span>
+    <span>Photographs: “Abbotsford House Study Room” by Michael D Beckwith, <a href="https://commons.wikimedia.org/wiki/File:Abbotsford_House_Study_Room.jpg">CC0, Wikimedia Commons</a>; “Wooden Card Catalog Furniture” by MarkBuckawicki, <a href="https://commons.wikimedia.org/wiki/File:Wooden_Card_Catalog_Furniture.jpg">CC0, Wikimedia Commons</a>.</span>
+  </p>
+  <p class="footer__name" aria-hidden="true">Learning Desk</p>
+</footer>
+
+<script src="assets/site.js" defer></script>
+</body>
+</html>

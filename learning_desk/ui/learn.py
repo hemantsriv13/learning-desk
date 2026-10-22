@@ -235,7 +235,7 @@ def lesson_page() -> None:
 
     st.segmented_control("View", VIEWS, key=view_key, required=True, label_visibility="collapsed", wrap=True,
                          format_func=lambda v: f"{VIEW_ICONS[v]} {v}", on_change=_save_view, args=(lesson,))
-    main, side = st.columns([2.7, 1], gap="large")
+    main, side = st.columns([2.3, 1], gap="large")
     with main:
         view = st.session_state[view_key]
         if view == "Overview":
@@ -493,10 +493,10 @@ def _source_row(cite) -> None:
 def side_panel(lesson: Lesson) -> None:
     with st.container(border=True, key=f"side-{lesson.id}"):
         label = status(lesson.id)
-        st.markdown("**Your progress**")
+        st.markdown("**Progress**")
         status_badge(label)
         done = label == "Completed"
-        if st.button("Mark as not complete" if done else "Mark lesson complete", key="toggle-complete",
+        if st.button("Not complete" if done else "Mark complete", key="toggle-complete",
                      icon=":material/undo:" if done else ":material/task_alt:", use_container_width=True):
             db.set_lesson_status(lesson.id, lesson.version, not done)
             st.rerun()

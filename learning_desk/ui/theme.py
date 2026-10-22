@@ -13,40 +13,82 @@ from .. import visuals
 
 CSS = """
 <style>
+/* True-black flat, warm: one ground, elevation by lightness alone (no borders or shadows on cards),
+   teal only on data and progress, the one primary action an inverted pill. */
 :root {
-  --ld-bg: #15181D; --ld-surface: #1F242B; --ld-surface-2: #262C35; --ld-border: #343B46;
-  --ld-text: #E2E5E9; --ld-muted: #AEB6C1; --ld-accent: #8DB8E6; --ld-accent-strong: #3E6A99;
-  --ld-ok: #7FC8A9; --ld-warn: #E0B46A; --ld-radius: 14px;
+  --ld-ground: #0e0d0c; --ld-panel: #181716; --ld-raised: #211f1d; --ld-hover: #1d1b19; --ld-figure: #161513;
+  --ld-rule: #2b2826; --ld-control: #4a4642;
+  --ld-text: #ebebe9; --ld-strong: #ffffff; --ld-muted: #b8b4ae; --ld-faint: #98948e;
+  --ld-data: #6db3c4; --ld-radius: 14px;
 }
-[data-testid="stMainBlockContainer"] { max-width: 1120px; padding-top: 2.25rem; padding-bottom: 5rem; }
-h1 { font-weight: 700 !important; letter-spacing: -0.015em; }
-h2, h3 { letter-spacing: -0.008em; }
+[data-testid="stMainBlockContainer"] { max-width: 1132px; padding-top: 2.5rem; padding-bottom: 5rem; }
+h1, h2, h3 { letter-spacing: -0.012em; }
+p, li { text-wrap: pretty; }
+/* Navigation recedes: the active item is its label brightening, nothing else. */
+[data-testid="stSidebarNav"] a { background: transparent !important; }
+[data-testid="stSidebarNav"] a span { color: var(--ld-muted) !important; }
+[data-testid="stSidebarNav"] a:hover span, [data-testid="stSidebarNav"] a[aria-current="page"] span { color: var(--ld-strong) !important; }
+[data-testid="stSidebarNav"] a[aria-current="page"] span { font-weight: 600; }
+[data-testid="stSidebarHeader"] { align-items: center; }
+[data-testid="stSidebarHeader"]::after { content: "Learning Desk"; color: var(--ld-strong); font-weight: 600;
+  font-size: 1.0625rem; letter-spacing: -0.01em; margin-left: .55rem; margin-right: auto; }
+/* The one primary action: an inverted pill. Secondary actions stay quiet. */
+[data-testid="stBaseButton-primary"], [data-testid="stBaseButton-primaryFormSubmit"] {
+  background: var(--ld-text) !important; color: var(--ld-ground) !important; border-color: var(--ld-text) !important; }
+[data-testid="stBaseButton-primary"] p, [data-testid="stBaseButton-primaryFormSubmit"] p { color: var(--ld-ground) !important; }
+[data-testid="stBaseButton-primary"]:hover { background: var(--ld-strong) !important; }
+[data-testid="stBaseButton-secondary"] { background: transparent; border-color: var(--ld-control); }
+[data-testid="stBaseButton-secondary"]:hover { border-color: var(--ld-muted); background: var(--ld-hover); }
+button p { word-break: normal !important; overflow-wrap: normal; }
+/* Selections are brightness, not colour: segmented controls, pills and tabs. */
+[data-testid="stBaseButton-segmented_controlActive"], [data-testid="stBaseButton-pillsActive"] {
+  background: var(--ld-raised) !important; border-color: var(--ld-muted) !important; color: var(--ld-strong) !important; }
+[data-testid="stBaseButton-segmented_controlActive"] p, [data-testid="stBaseButton-pillsActive"] p { color: var(--ld-strong) !important; }
+[data-baseweb="tab-highlight"] { background-color: var(--ld-text) !important; }
+[data-baseweb="tab"][aria-selected="true"] p { color: var(--ld-strong) !important; }
+/* Panels: one lightness step above the ground, no edge. */
+[class*="st-key-card"], [class*="st-key-panel"], [class*="st-key-hero"], [class*="st-key-side"],
+[class*="st-key-notes"], [class*="st-key-objective"], [class*="st-key-tile"] {
+  background: var(--ld-panel); border-color: transparent !important; border-radius: var(--ld-radius) !important; }
+[class*="st-key-card"] { transition: background-color .15s ease; }
+[class*="st-key-card"]:hover, [class*="st-key-card"]:focus-within { background: var(--ld-hover); }
+[class*="st-key-muted-card"] { background: transparent; border-color: var(--ld-rule) !important; border-radius: var(--ld-radius) !important; }
+[class*="st-key-muted-card"] p, [class*="st-key-muted-card"] [data-testid="stCaptionContainer"] { color: var(--ld-faint); }
+[class*="st-key-row"] { background: var(--ld-raised); border-color: transparent !important; border-radius: 12px !important; }
+[class*="st-key-figure"] { background: var(--ld-figure); border-color: transparent !important; border-radius: var(--ld-radius) !important; }
+/* In a stretched panel, only its closing action sits at the foot. */
+.st-key-panel-notes > div:last-child, .st-key-panel-path > div:last-child { margin-top: auto; }
+/* Count tiles: label above, value in regular weight with tabular figures. */
+.ld-tile-label { color: var(--ld-muted); font-size: .875rem; margin: 0; }
+.ld-tile-value { color: var(--ld-strong); font-size: 1.75rem; font-weight: 400; font-variant-numeric: tabular-nums;
+  line-height: 1.15; margin: .35rem 0 .2rem 0; }
+.ld-tile-unit { color: var(--ld-faint); font-size: 1rem; }
+/* The lesson strip: one cell per finished lesson, grouped by topic. */
+.ld-strip { display: flex; flex-wrap: nowrap; justify-content: space-between; gap: 8px; margin: .5rem 0 .75rem 0;
+  padding: 0; list-style: none; }
+.ld-strip li { display: flex; gap: 3px; }
+.ld-strip span { display: block; width: clamp(12px, 1.6vw, 22px); height: 64px; border-radius: 5px; background: var(--ld-raised); }
+.ld-strip span { position: relative; overflow: hidden; }
+.ld-strip span.started::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 45%;
+  background: var(--ld-data); }
+.ld-strip span.done { background: var(--ld-data); }
 /* Comfortable reading measure for lesson and reader prose. */
 [class*="st-key-prose"] { max-width: 46rem; }
-[class*="st-key-prose"] p, [class*="st-key-prose"] li { font-size: 1.05rem; line-height: 1.7; }
-/* Cards: resources, lessons, topics. */
-[class*="st-key-card"] { background: var(--ld-surface); border: 1px solid var(--ld-border) !important;
-  border-radius: var(--ld-radius) !important; transition: border-color .15s ease; }
-[class*="st-key-card"]:hover, [class*="st-key-card"]:focus-within { border-color: var(--ld-accent-strong) !important; }
-[class*="st-key-muted-card"] { opacity: .92; border-style: dashed !important; }
-/* The Continue learning panel. */
-[class*="st-key-hero"] { background: linear-gradient(135deg, #1E3047 0%, #1F242B 75%);
-  border: 1px solid #2F4B6C !important; border-radius: 18px !important; padding: 0.4rem 0.6rem; }
-/* Lesson objective and provenance callouts. */
-[class*="st-key-objective"] { border-left: 4px solid var(--ld-accent) !important; background: var(--ld-surface);
-  border-radius: 10px !important; }
-[class*="st-key-figure"] { background: #1B2027; border: 1px solid var(--ld-border) !important;
-  border-radius: var(--ld-radius) !important; }
+[class*="st-key-prose"] p, [class*="st-key-prose"] li { font-size: 1.0625rem; line-height: 1.7; }
 .ld-figure { margin: 0; overflow-x: auto; }
 .ld-figure img { min-width: 520px; }
-.ld-scroll-hint { display: none; color: var(--ld-muted); font-size: .8rem; margin: .25rem 0 0 0; }
-.ld-eyebrow { color: var(--ld-muted); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; margin: 0; }
+.ld-scroll-hint { display: none; color: var(--ld-muted); font-size: .8125rem; margin: .25rem 0 0 0; }
 /* Lesson contents: left-aligned, wrapping entries. */
 [class*="st-key-side"] [data-testid="stButton"] button { justify-content: flex-start; text-align: left; width: 100%; }
 [class*="st-key-side"] [data-testid="stButton"] button p { text-align: left; }
-:focus-visible { outline: 2px solid var(--ld-accent) !important; outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--ld-text) !important; outline-offset: 2px; }
 @media (max-width: 640px) {
-  [data-testid="stMainBlockContainer"] { padding: 1.25rem 1rem 4rem 1rem; }
+  [data-testid="stMainBlockContainer"] { padding: 3.75rem 1rem 4rem 1rem; }
+  h1 { font-size: 1.5rem !important; }
+  /* Count tiles become a 2 x 2 grid on a phone. */
+  .st-key-tiles [data-testid="stHorizontalBlock"] { flex-flow: row wrap !important; gap: .75rem !important; }
+  .st-key-tiles [data-testid="stColumn"] { flex: 1 1 calc(50% - .375rem) !important; min-width: calc(50% - .375rem) !important; width: calc(50% - .375rem) !important; }
+  .ld-tile-value { font-size: 1.5rem; }
   [class*="st-key-prose"] p, [class*="st-key-prose"] li { font-size: 1rem; }
   .ld-scroll-hint { display: block; }
 }
@@ -54,14 +96,15 @@ h2, h3 { letter-spacing: -0.008em; }
 </style>
 """
 
-LEVEL_COLOURS = {"introductory": "green", "intermediate": "blue", "advanced": "violet"}
+# Levels are information, not status: one neutral colour.
+LEVEL_COLOURS = {"introductory": "gray", "intermediate": "gray", "advanced": "gray"}
 STATUS_STYLE = {  # label -> (badge colour, Material icon)
     "Completed": ("green", ":material/check_circle:"),
-    "In progress": ("blue", ":material/play_circle:"),
+    "In progress": ("primary", ":material/play_circle:"),
     "Ready": ("gray", ":material/menu_book:"),
     "Outline": ("orange", ":material/edit_note:"),
     "Saved": ("gray", ":material/bookmark:"),
-    "Reading": ("blue", ":material/auto_stories:"),
+    "Reading": ("primary", ":material/auto_stories:"),
     "Finished": ("green", ":material/check_circle:"),
 }
 RESOURCE_ICONS = {"reference": ":material/link:", "documentation": ":material/description:",
