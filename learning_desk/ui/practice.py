@@ -89,8 +89,19 @@ def render_quiz(set_id):
         inspect_call(db.get_ai_call(qs["ai_call_id"]))
         return
     q = questions[pos]
-    st.caption(f"Question {pos + 1} of {len(questions)}")
+    st.progress(pos / len(questions), text=f"Question {pos + 1} of {len(questions)}")
     st.markdown(safe_md(q["text"]))
+    with st.popover("Open the source", icon=":material/menu_book:"):
+        # Open-book practice: the exact source this quiz was generated from, without marking
+        # which passages the question cites (those appear with the feedback).
+        st.caption("The exact source version or notebook snapshot this question was generated from.")
+        try:
+            for passage in learning.source(content_version_id=qs["content_version_id"],
+                                           snapshot_id=qs["snapshot_id"]):
+                st.caption(f"S{passage['id']}")
+                st.text(passage["text"])
+        except ValueError as exc:
+            st.warning(str(exc))
     options = json.loads(q["options_json"])
     with st.form(f"attempt_{q['id']}", clear_on_submit=False):
         answer = (

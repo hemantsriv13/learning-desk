@@ -346,7 +346,7 @@ def save_answer(question_id: int, answer: str) -> None:
 # ---------- export ----------
 
 def dump_all() -> dict:
-    tables = ["sessions", "queue_items", "snapshots", "ai_calls", "question_sets", "questions", "resources", "content_versions", "resource_sessions", "summaries", "answer_attempts", "attempt_feedback", "issue_reports", "activity", "quiz_progress", "reader_progress"]
+    tables = ["sessions", "queue_items", "snapshots", "ai_calls", "question_sets", "questions", "resources", "content_versions", "resource_sessions", "summaries", "answer_attempts", "attempt_feedback", "issue_reports", "activity", "quiz_progress", "reader_progress", "lesson_progress", "lesson_notes", "lesson_check_attempts"]
     with connect() as conn:
         return {t: _rows(conn.execute(f"SELECT * FROM {t} ORDER BY id").fetchall()) for t in tables}
 
@@ -394,10 +394,13 @@ def add_content(resource_id, text, source_url='', import_note='Pasted by learner
                    (resource_id,text,source_url,import_note,digest,now(),json.dumps(links or [])))
 
 
-def set_activity(kind, target_id):
-    if kind not in ('resource','quiz','session'):
+def set_activity(kind, target_id, key=None):
+    """The one current activity. Lessons have text ids, stored in target_key (target_id is 0)."""
+    if kind not in ('resource','quiz','session','lesson'):
         raise ValueError('Invalid activity')
-    execute('INSERT INTO activity(id,kind,target_id,updated_at) VALUES(1,?,?,?) ON CONFLICT(id) DO UPDATE SET kind=excluded.kind,target_id=excluded.target_id,updated_at=excluded.updated_at', (kind,target_id,now()))
+    if (kind == 'lesson') != (key is not None):
+        raise ValueError('Lesson activity needs a lesson id, and only lessons use one')
+    execute('INSERT INTO activity(id,kind,target_id,target_key,updated_at) VALUES(1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET kind=excluded.kind,target_id=excluded.target_id,target_key=excluded.target_key,updated_at=excluded.updated_at', (kind,target_id,key,now()))
 
 
 def attempts(question_id):
@@ -412,3 +415,54 @@ def submit_attempt(question_id, answer):
         conn.execute('UPDATE questions SET answer=?,answered_at=? WHERE id=?',(answer,now(),question_id))
     set_activity('quiz', get_question(question_id)['set_id'])
     return attempt_id
+
+
+# ---------- built-in lessons ----------
+
+def lesson_progress(lesson_id=None):
+    """One lesson's progress row (or None), or every row when lesson_id is None."""
+    if lesson_id is None:
+        return query('SELECT * FROM lesson_progress ORDER BY updated_at DESC, id DESC')
+    rows = query('SELECT * FROM lesson_progress WHERE lesson_id=?', (lesson_id,))
+    return rows[0] if rows else None
+
+
+def save_lesson_place(lesson_id, version, view=None, section=None):
+    """Remember where the learner is. Creates the row on first visit; never lowers the status."""
+    ts = now()
+    execute('INSERT INTO lesson_progress(lesson_id,lesson_version,view,section,started_at,updated_at) '
+            "VALUES(?,?,COALESCE(?, 'Overview'),COALESCE(?, ''),?,?) ON CONFLICT(lesson_id) DO UPDATE SET "
+            'lesson_version=excluded.lesson_version,view=COALESCE(?, view),section=COALESCE(?, section),'
+            'updated_at=excluded.updated_at', (lesson_id, version, view, section, ts, ts, view, section))
+
+
+def set_lesson_status(lesson_id, version, completed):
+    save_lesson_place(lesson_id, version)
+    execute('UPDATE lesson_progress SET status=?,completed_at=? WHERE lesson_id=?',
+            ('completed' if completed else 'started', now() if completed else None, lesson_id))
+
+
+def lesson_note(lesson_id):
+    rows = query('SELECT * FROM lesson_notes WHERE lesson_id=?', (lesson_id,))
+    return rows[0] if rows else None
+
+
+def save_lesson_note(lesson_id, version, text):
+    if len(text) > 100000:
+        raise ValueError('Notes are limited to 100,000 characters')
+    execute('INSERT INTO lesson_notes(lesson_id,text,lesson_version,updated_at) VALUES(?,?,?,?) '
+            'ON CONFLICT(lesson_id) DO UPDATE SET text=excluded.text,lesson_version=excluded.lesson_version,'
+            'updated_at=excluded.updated_at', (lesson_id, text, version, now()))
+
+
+def add_check_attempt(lesson_id, version, check_id, answer, correct):
+    """Every submission is kept, with the lesson version it was answered against."""
+    return execute('INSERT INTO lesson_check_attempts(lesson_id,lesson_version,check_id,answer,correct,created_at) '
+                   'VALUES(?,?,?,?,?,?)', (lesson_id, version, check_id, answer, int(bool(correct)), now()))
+
+
+def check_attempts(lesson_id, check_id=None):
+    if check_id is None:
+        return query('SELECT * FROM lesson_check_attempts WHERE lesson_id=? ORDER BY id', (lesson_id,))
+    return query('SELECT * FROM lesson_check_attempts WHERE lesson_id=? AND check_id=? ORDER BY id',
+                 (lesson_id, check_id))

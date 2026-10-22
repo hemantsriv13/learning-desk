@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 import streamlit as st
 from .. import db, importer, learning
 from .common import ai_ready, ai_privacy_note, inspect_call, safe_md
+from .theme import LEVEL_COLOURS, RESOURCE_ICONS, STATUS_STYLE, badges
 
 LEVELS = ["introductory", "intermediate", "advanced"]
 TYPES = ["reference", "documentation", "article", "pasted"]
@@ -31,48 +32,79 @@ def open_resource(rid):
     st.rerun()
 
 
+def resource_card(r, version_count):
+    with st.container(border=True, key=f"card-res-{r['id']}"):
+        st.markdown(f"{RESOURCE_ICONS.get(r['resource_type'], '')} **{r['title']}**")
+        colour, icon = STATUS_STYLE[r["status"]]
+        badges((r["status"], colour, icon), (r["level"], LEVEL_COLOURS[r["level"]], None),
+               (r["resource_type"], "gray", None))
+        tags = ", ".join(t.strip() for t in r["tags"].split(",") if t.strip() and not t.strip().startswith("lesson:"))
+        details = [f"Topic: {tags}"] if tags else []
+        details.append(f"{version_count} saved version(s)" if version_count
+                       else "Bookmark only — content not imported")
+        if r["archived"]:
+            details.append("archived")
+        st.caption(" · ".join(details))
+        if st.button("Open", key=f"resource_{r['id']}", icon=":material/arrow_forward:"):
+            open_resource(r["id"])
+
+
 def render():
-    st.title("Library")
     quiz = st.session_state.get("active_quiz")
     if quiz:
         from .practice import render_quiz
 
-        if st.button("Back to Library"):
+        if st.button("Back to Library", icon=":material/arrow_back:", type="tertiary"):
             st.session_state.pop("active_quiz", None)
             st.rerun()
         render_quiz(quiz)
         return
     rid = st.session_state.get("resource_id")
     if rid:
-        if st.button("Back to Library"):
+        if st.button("Back to Library", icon=":material/arrow_back:", type="tertiary"):
             st.session_state.pop("resource_id", None)
             st.rerun()
         reader(rid)
         return
+    st.title("Library")
+    st.caption("Your saved links, documentation and pasted material. Reading never calls a model; "
+               "summaries and quizzes are generated only when you ask.")
     query = st.text_input(
         "Search resources", placeholder="Title, topic, tags, level or status"
     )
-    archived = st.toggle("Show archived resources")
+    c1, c2 = st.columns([3, 1.3], vertical_alignment="center")
+    status_filter = c1.segmented_control("Reading status", ["All", "Saved", "Reading", "Finished"],
+                                         default="All", key="library_status")
+    archived = c2.toggle("Show archived resources")
     resources = db.list_resources(query, archived)
+    if status_filter and status_filter != "All":
+        resources = [r for r in resources if r["status"] == status_filter]
+    if query.strip():
+        from .. import curriculum
+        from .learn import all_progress, lesson_card
+
+        lessons = curriculum.search(query)
+        if lessons:
+            st.subheader(f"Built-in lessons ({len(lessons)})")
+            progress = all_progress()
+            cols = st.columns(2)
+            for i, lesson in enumerate(lessons[:4]):
+                with cols[i % 2]:
+                    lesson_card(lesson, progress, "library")
+            st.subheader("Your resources")
+    counts = {row["resource_id"]: row["n"] for row in db.query(
+        "SELECT resource_id, COUNT(*) AS n FROM content_versions GROUP BY resource_id")}
     if not resources:
-        st.write("No resources here yet. Save a link or paste some material below.")
-    for r in resources:
-        with st.container(border=True):
-            versions = db.query(
-                "SELECT id FROM content_versions WHERE resource_id=?", (r["id"],)
-            )
-            st.write(r["title"])
-            st.caption(
-                f"{r['status']} · {r['level']} · {r['resource_type']} · "
-                + (
-                    "Content saved"
-                    if versions
-                    else "Bookmark only — content not imported"
-                )
-            )
-            if st.button("Open", key=f"resource_{r['id']}"):
-                open_resource(r["id"])
-    with st.expander("Add a resource", expanded=not resources):
+        if query.strip() or (status_filter and status_filter != "All"):
+            st.info("No resources match these filters. Clear the search or choose All.", icon=":material/search_off:")
+        else:
+            st.info("No resources here yet. Save a link or paste some material below, or start with a "
+                    "built-in lesson in Explore.", icon=":material/library_add:")
+    cols = st.columns(2)
+    for i, r in enumerate(resources):
+        with cols[i % 2]:
+            resource_card(r, counts.get(r["id"], 0))
+    with st.expander("Add a resource", expanded=not resources and not query.strip()):
         with st.form("add_resource"):
             title = st.text_input("Title")
             url = st.text_input("URL (optional)")
@@ -99,7 +131,8 @@ def render():
         from ..starter import PATH
 
         st.caption(
-            "Optional starter suggestions, separate from your history. Links are bookmarks until explicitly imported."
+            "Optional starter suggestions, separate from your history. Links are bookmarks until explicitly imported. "
+            "For illustrated lessons on these topics, see Explore."
         )
         for item in PATH:
             st.write(item["title"])
@@ -120,7 +153,19 @@ def reader(rid):
         st.warning("Resource is unavailable.")
         return
     r = rows[0]
-    st.subheader(r["title"])
+    lesson_id = next((t.strip()[7:] for t in r["tags"].split(",") if t.strip().startswith("lesson:")), None)
+    if lesson_id:
+        from .common import open_lesson
+
+        if st.button("Back to the lesson", icon=":material/school:", key="reader-back-lesson"):
+            open_lesson(lesson_id)
+    st.title(r["title"])
+    colour, icon = STATUS_STYLE[r["status"]]
+    badges((r["status"], colour, icon), (r["level"], LEVEL_COLOURS[r["level"]], None),
+           (r["resource_type"], "gray", RESOURCE_ICONS.get(r["resource_type"])))
+    if lesson_id:
+        st.caption("A saved copy of a built-in lesson. The text below is the original lesson; anything under "
+                   "Quick read or Explain it is AI-generated from this exact version.")
     web_link("Open original source", r["url"])
     versions = db.query(
         "SELECT * FROM content_versions WHERE resource_id=? ORDER BY id DESC", (rid,)
@@ -243,7 +288,8 @@ def reader(rid):
             (rid, vid, mode),
         )
     if mode == "Original text":
-        st.markdown(safe_md(v["text"]))
+        with st.container(key=f"prose-reader-{vid}"):
+            st.markdown(safe_md(v["text"]))
     elif mode in ("Quick read", "Explain it"):
         kind = "quick" if mode == "Quick read" else "explain"
         summaries = db.query(
