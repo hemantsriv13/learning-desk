@@ -12,17 +12,17 @@ from html import escape
 from typing import Callable
 
 # Palette for the dark theme. Text colours keep at least 7:1 contrast against PANEL.
-PANEL = "#161513"
-TEXT = "#EBEBE9"
-MUTED = "#B8B4AE"
-LINE = "#6B665F"
-TONES = {  # (fill, stroke, text): warm neutrals, teal as the one data hue, status colours for status only
-    "neutral": ("#211F1D", "#4F4A45", TEXT),
-    "accent": ("#132A30", "#6DB3C4", "#CBE8EF"),
+PANEL = "#222222"
+TEXT = "#f0f0f0"
+MUTED = "#b5b5b5"
+LINE = "#7a7a7a"
+TONES = {  # (fill, stroke, text): plum neutrals, teal as the one data hue, status colours for status only
+    "neutral": ("#353535", "#5a5a5a", TEXT),
+    "accent": ("#132A30", "#3ddc97", "#CBE8EF"),
     "ok": ("#1C3A30", "#7FC8A9", "#CBEBDD"),
-    "warn": ("#3B3020", "#E0B46A", "#F2DDB5"),
+    "warn": ("#3B3020", "#ffb347", "#F2DDB5"),
     "bad": ("#3F2329", "#E58A8A", "#F6CFCF"),
-    "quiet": ("#1C1A18", "#3D3935", MUTED),
+    "quiet": ("#262626", "#4a4a4a", MUTED),
 }
 FONT = "Segoe UI, system-ui, -apple-system, Helvetica, Arial, sans-serif"
 MONO = "Source Code Pro, Consolas, ui-monospace, monospace"
@@ -501,12 +501,12 @@ def attention_heatmap(highlight="it"):
             else:
                 level = min(1.0, w * 1.6)
                 fill = f"rgb({int(31 + 78 * level)},{int(29 + 150 * level)},{int(27 + 169 * level)})"  # warm black to teal
-            stroke = TONES["accent"][1] if i == row else "#2B2826"
+            stroke = TONES["accent"][1] if i == row else "#444444"
             body.append(f'<rect x="{left + j * cell}" y="{y}" width="{cell - 2}" height="{cell - 2}" '
                         f'fill="{fill}" stroke="{stroke}"/>')
             if i == row and j <= i:
                 body.append(_t(left + j * cell + cell / 2 - 1, y + cell / 2 + 4, f"{w:.2f}", 11,
-                               fill="#0E0D0C" if w > 0.35 else TEXT))
+                               fill="#050505" if w > 0.35 else TEXT))
     top_j = max(range(n), key=lambda j: weights[row][j])
     return _svg(u, left + n * cell + 20, top + n * cell + 20, "Toy attention heatmap",
                 f"A ten-by-ten grid for the sentence 'The animal didn't cross the street because it was tired'. "
@@ -647,6 +647,10 @@ def thumbnail(topic_id):
     """Small original pictogram for a topic card. Decorative only in the sense of being
     redundant with the visible title, so it is hidden from assistive technology."""
     a, o, w = TONES["accent"][1], TONES["ok"][1], TONES["warn"][1]
+    # Topics with outlines only: a dashed, unwritten page.
+    planned = (f'<rect x="38" y="12" width="44" height="48" rx="5" fill="none" stroke="{MUTED}" stroke-width="1.5" '
+               f'stroke-dasharray="4 3"/>' + "".join(f'<rect x="46" y="{22 + i * 9}" width="{28 - i * 6}" height="3" '
+                                                     f'rx="1.5" fill="{MUTED}" opacity="0.5"/>' for i in range(4)))
     art = {
         "python": f'<text x="60" y="47" font-size="30" text-anchor="middle" fill="{a}" font-family="{MONO}">{{ }}</text>'
                   f'<text x="60" y="64" font-size="11" text-anchor="middle" fill="{MUTED}" font-family="{MONO}">def f(x):</text>',
@@ -674,7 +678,7 @@ def thumbnail(topic_id):
     }
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 72" aria-hidden="true" '
             f'style="width:100%;height:auto;display:block"><rect width="120" height="72" rx="10" fill="{PANEL}"/>'
-            f'{art.get(topic_id, "")}</svg>')
+            f'{art.get(topic_id, planned)}</svg>')
 
 
 # ---------------------------------------------------------------- registry

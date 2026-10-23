@@ -2,8 +2,9 @@
 
 import streamlit as st
 
-from .. import config, db, example, export, prompts, provider
+from .. import config, db, example, export, pixels, prompts, provider
 from .common import add_queue_item_form, fmt_time, open_session, queue_item_row, show_flash
+from .theme import empty_state, page_header
 
 
 def home() -> None:
@@ -54,12 +55,12 @@ def home() -> None:
 
 def queue() -> None:
     show_flash()
-    st.title("Next-session queue")
-    st.caption("Ordered by the priority you choose. No reminders or scheduling. Edits save when you leave a field.")
+    page_header("Next-session queue", "Questions and tasks for next time, in the priority you choose. Edits save "
+                "when you leave a field.", "checklist", "green", art=pixels.img(pixels.queue_scene(), 224))
     sessions = db.list_sessions()
     open_items = db.list_queue(status="open")
     if not open_items:
-        st.write("Nothing open.")
+        empty_state("Nothing open. Add a question or task below for your next session.")
     for item in open_items:
         with st.container(border=True):
             queue_item_row(item, ctx="queue", show_session=True)
@@ -73,7 +74,8 @@ def queue() -> None:
 
 def search() -> None:
     show_flash()
-    st.title("Search & export")
+    page_header("Search & export", "Find words in your sessions and notes, or download everything.", "search", "blue",
+                art=pixels.img(pixels.search_scene(), 224))
     query = st.text_input("Search titles, topics and notes", placeholder="Plain text, not case-sensitive")
     if query.strip():
         results = db.search_sessions(query)
@@ -107,7 +109,8 @@ def _snippet(session: dict, query: str, width: int = 80) -> str:
 
 def settings() -> None:
     show_flash()
-    st.title("Settings & About")
+    page_header("Settings & About", "Your AI provider, your data, and how Learning Desk works.", "settings", "gray",
+                art=pixels.img(pixels.settings_scene(), 224))
 
     st.subheader("AI provider")
     key_state = "set" if config.api_key_present() else "NOT set (AI features are disabled)"

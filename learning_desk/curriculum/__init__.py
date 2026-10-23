@@ -7,7 +7,7 @@ from .. import visuals
 from . import lessons_building, lessons_foundations, lessons_models, lessons_retrieval
 from .model import ORIGINAL, VIEWS, Lesson, Outline, Topic, validate
 from .sources import SOURCES
-from .topics import OUTLINES, TOPICS
+from .topics import CORE, OUTLINES, TOPICS, TRACK_ORDER
 
 LESSONS: dict[str, Lesson] = {
     lesson.id: lesson
@@ -78,5 +78,5 @@ def lesson_markdown(lesson: Lesson) -> str:
     return "\n".join(out) + "\n"
 
 
-__all__ = ["LESSONS", "OUTLINES", "TOPICS", "TOPIC_BY_ID", "SOURCES", "VIEWS", "ORIGINAL", "get",
+__all__ = ["LESSONS", "OUTLINES", "TOPICS", "TOPIC_BY_ID", "CORE", "TRACK_ORDER", "SOURCES", "VIEWS", "ORIGINAL", "get",
            "topic_items", "search", "lesson_markdown"]

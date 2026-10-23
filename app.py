@@ -13,8 +13,8 @@ db.init_db()
 common.PAGES.update(
     home=st.Page(today.today, title="Home", icon=":material/home:", default=True),
     explore=st.Page(learn.explore, title="Explore", icon=":material/explore:", url_path="explore"),
-    library=st.Page(library.render, title="Library", icon=":material/local_library:", url_path="library"),
-    notebook=st.Page(today.notebook, title="Notebook", icon=":material/menu_book:", url_path="notebook"),
+    library=st.Page(library.render, title="Library", icon=":material/collections_bookmark:", url_path="library"),
+    notebook=st.Page(today.notebook, title="Notebook", icon=":material/book_2:", url_path="notebook"),
     lesson=st.Page(learn.lesson_page, title="Lesson", icon=":material/school:", url_path="lesson",
                    visibility="hidden"),
     session=st.Page(session_page.render, title="Session", icon=":material/edit_note:", url_path="session", visibility="hidden"),
