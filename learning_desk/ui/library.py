@@ -3,9 +3,9 @@
 import json
 from urllib.parse import urlsplit
 import streamlit as st
-from .. import db, importer, learning
+from .. import db, importer, learning, pixels
 from .common import ai_ready, ai_privacy_note, inspect_call, safe_md
-from .theme import LEVEL_COLOURS, RESOURCE_ICONS, STATUS_STYLE, badges
+from .theme import LEVEL_COLOURS, RESOURCE_ICONS, STATUS_STYLE, badges, page_header
 
 LEVELS = ["introductory", "intermediate", "advanced"]
 TYPES = ["reference", "documentation", "article", "pasted"]
@@ -66,9 +66,8 @@ def render():
             st.rerun()
         reader(rid)
         return
-    st.title("Library")
-    st.caption("Your saved links, documentation and pasted material. Reading never calls a model; "
-               "summaries and quizzes are generated only when you ask.")
+    page_header("Library", "Your saved links, documentation and pasted material. Summaries and quizzes are made "
+                "only when you ask.", "collections_bookmark", "amber", art=pixels.img(pixels.library_scene(), 224))
     query = st.text_input(
         "Search resources", placeholder="Title, topic, tags, level or status"
     )

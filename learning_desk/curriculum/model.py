@@ -125,6 +125,7 @@ class Topic:
     blurb: str
     why: str
     lessons: tuple[str, ...] = field(default_factory=tuple)  # lesson and outline ids, in order
+    track: str = "Core path"  # the Explore map groups topics by track
 
 
 def validate(topics, lessons, outlines, sources, visuals) -> list[str]:

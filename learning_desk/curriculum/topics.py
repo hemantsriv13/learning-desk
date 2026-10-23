@@ -1,8 +1,12 @@
-"""The curriculum map: ten topics, each listing finished lessons and planned outlines in order."""
+"""The curriculum map: the ten core topics, each listing finished lessons and planned outlines in order,
+followed by the planned tracks in topics_planned.py (outlines only)."""
 
 from .model import Outline, Topic
+from .topics_planned import PLANNED_OUTLINES, PLANNED_TOPICS, TRACKS
 
-TOPICS = (
+CORE = "Core path"
+
+CORE_TOPICS = (
     Topic("python", 1, "Python for AI applications", "code",
           "The data shapes, functions and error handling that most AI code is made of.",
           "Model APIs send and receive nested data. Reading and reshaping it confidently removes most "
@@ -47,6 +51,8 @@ TOPICS = (
           "A capable model inside a slow, costly or brittle product still fails its users.",
           ("latency-cost-reliability", "choosing-models")),
 )
+TOPICS = CORE_TOPICS + PLANNED_TOPICS
+TRACK_ORDER = (CORE, *TRACKS)
 
 OUTLINES = {o.id: o for o in (
     Outline("python-errors-network", "python", "Errors around network calls",
@@ -102,4 +108,5 @@ OUTLINES = {o.id: o for o in (
     Outline("choosing-models", "product", "Choosing a model for a task",
             "Compare models on your own evaluation set, not on general reputation.",
             ("Quality, speed and price together", "Routing simple and hard requests", "Re-evaluating after upgrades")),
+    *PLANNED_OUTLINES,
 )}

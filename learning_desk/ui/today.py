@@ -1,15 +1,16 @@
 """Home puts one persisted, explicitly chosen activity first; Notebook gathers personal notes and reviews."""
 
 import json
-from datetime import datetime
+from datetime import date, datetime
 from html import escape
 
 import streamlit as st
 
-from .. import curriculum, db
-from ..curriculum import LESSONS, TOPIC_BY_ID, TOPICS
+from .. import curriculum, db, pixels, visuals
+from ..curriculum import LESSONS, TOPIC_BY_ID, TOPICS, TRACK_ORDER
 from . import learn
 from .common import PAGES, fmt_time, go, open_lesson, open_session, show_flash
+from .theme import TRACK_HUES, empty_state, heading, page_header, progress_ring, stats, status_badge, steps, svg_img
 
 
 def resume(kind, target_id, key=None):
@@ -71,11 +72,97 @@ def _greeting(now: datetime) -> str:
     return f"Good {part}"
 
 
-def _tile(label: str, value: int, unit: str, caption: str, key: str) -> None:
-    with st.container(border=True, key=f"tile-{key}", height="stretch"):
-        st.html(f'<p class="ld-tile-label">{escape(label)}</p>'
-                f'<p class="ld-tile-value">{value}<span class="ld-tile-unit">{escape(unit)}</span></p>')
-        st.caption(caption)
+def _time_icon(now: datetime) -> str:
+    return "wb_twilight" if now.hour < 12 else "light_mode" if now.hour < 18 else "dark_mode"
+
+
+def _shift_idea() -> None:
+    st.session_state["idea_shift"] = st.session_state.get("idea_shift", 0) + 1
+
+
+def _idea_of_the_day() -> None:
+    """One key idea from a finished lesson. It changes each day; "Another idea" steps through the rest."""
+    ideas = [(lesson, idea) for lesson in LESSONS.values() for idea in lesson.key_ideas]
+    lesson, idea = ideas[(date.today().toordinal() * 7 + st.session_state.get("idea_shift", 0)) % len(ideas)]
+    with st.container(border=True, key="card-idea", height="stretch"):
+        heading("lightbulb", "Idea of the day", f"From {lesson.title}", hue="amber")
+        st.html(f'<p class="ld-idea">{escape(idea)}</p>')
+        st.html(f'<div class="ld-thumb-wrap">{svg_img(visuals.thumbnail(lesson.topic), "", "ld-thumb")}</div>')
+        with st.container(horizontal=True, gap="small"):
+            if st.button("Open the lesson", key="idea-open", icon=":material/arrow_forward:"):
+                open_lesson(lesson.id)
+            st.button("Another idea", key="idea-next", icon=":material/shuffle:", type="tertiary", on_click=_shift_idea)
+
+
+def _track_tiles(progress: dict) -> None:
+    """The six tracks as coloured tiles; each opens Explore filtered to that track."""
+    with st.container(border=True, key="panel-tracks", height="stretch"):
+        heading("map", "Explore by track", f"{len(TOPICS)} topics in {len(TRACK_ORDER)} tracks", hue="teal")
+        cols = st.columns(3)
+        for i, name in enumerate(TRACK_ORDER):
+            topics = [t for t in TOPICS if t.track == name]
+            ready = sum(learn.topic_counts(t.id, progress)[0] for t in topics)
+            note = f"{len(topics)} topics · {ready} lessons" if ready else f"{len(topics)} topics · planned"
+            with cols[i % 3], st.container(border=True, key=f"tile-track-{i}", height="stretch"):
+                # The animated icon sits above the name: beside it, it would squeeze the name in a narrow tile.
+                st.html(pixels.img(pixels.TRACK_ICONS[name](), 42))
+                heading(learn.TRACK_ICONS[name], name, note, hue=TRACK_HUES[name])
+                if st.button("Browse", key=f"track-{i}", icon=":material/arrow_forward:", type="tertiary"):
+                    st.session_state["explore_track"] = name
+                    st.session_state.pop("explore_topic", None)
+                    go("explore")
+
+
+def _lesson_place(lesson) -> tuple[int, str]:
+    """(0-based walkthrough section you are at, -1 before it, the section count after it; a line saying so)."""
+    place = db.lesson_progress(lesson.id)
+    sections = lesson.walkthrough()
+    if not place or place["view"] == "Overview":
+        return -1, f"Not into the walkthrough yet · {len(sections)} sections"
+    if place["view"] in ("Try it", "Sources"):
+        return len(sections), f"Past all {len(sections)} sections · now on {place['view']}"
+    ids = [s.id for s in sections]
+    index = ids.index(place["section"]) if place["section"] in ids else 0
+    return index, f"Section {index + 1} of {len(sections)}: {sections[index].title}"
+
+
+def _continue_panel(current, label) -> None:
+    with st.container(border=True, key="hero-continue", height="stretch"):
+        heading("play_circle", "Pick up where you left off" if label else "Start here", hue="teal")
+        if label:
+            kind, _, key = current
+            lesson = LESSONS.get(key) if kind == "lesson" else None
+            text, art = st.columns([3, 1], vertical_alignment="center") if lesson else (st.container(), None)
+            with text:
+                st.markdown(f"### {label}")
+                st.caption(activity_context(*current))
+                if lesson:
+                    st.markdown(lesson.objective)
+                    index, where = _lesson_place(lesson)
+                    st.html(steps(len(lesson.walkthrough()), index, where))
+                    answered = {a["check_id"] for a in db.check_attempts(lesson.id)}
+                    st.caption(f"{where} · Quick check: {len(answered)} of {len(lesson.checks)} answered")
+            if art is not None:
+                with art:
+                    st.html(f'<div class="ld-thumb-wrap">{svg_img(visuals.thumbnail(lesson.topic), "", "ld-thumb")}</div>')
+            if st.button("Continue learning", type="primary", icon=":material/play_arrow:"):
+                resume(*current)
+        else:
+            first = next(iter(LESSONS.values()))
+            text, art = st.columns([3, 1], vertical_alignment="center")
+            with text:
+                st.markdown(f"### {first.title}")
+                st.caption(f"{TOPIC_BY_ID[first.topic].title} · about {first.minutes} minutes · no prerequisites")
+                st.markdown(first.objective)
+            with art:
+                st.html(f'<div class="ld-thumb-wrap">{svg_img(visuals.thumbnail(first.topic), "", "ld-thumb")}</div>')
+            with st.container(horizontal=True, gap="small"):
+                if st.button("Start with the first lesson", type="primary", icon=":material/school:"):
+                    open_lesson(first.id)
+                if st.button("Read your own material", icon=":material/collections_bookmark:"):
+                    st.session_state.pop("resource_id", None)
+                    st.session_state.pop("active_quiz", None)
+                    go("library")
 
 
 def lesson_strip(progress: dict) -> str:
@@ -84,12 +171,14 @@ def lesson_strip(progress: dict) -> str:
     groups = []
     for topic in TOPICS:
         ids = [lid for lid in topic.lessons if lid in LESSONS]
+        if not ids:  # planned topics have outlines only; there is nothing to fill in yet
+            continue
         states = [learn.status(lid, progress) for lid in ids]
         cells = "".join(f'<span class="{"done" if s == "Completed" else "started" if s == "In progress" else ""}">'
                         f'</span>' for s in states)
         done = states.count("Completed")
         label = f"{topic.title}: {done} of {len(ids)} completed"
-        groups.append(f'<li role="img" aria-label="{escape(label, quote=True)}" title="{escape(label, quote=True)}">'
+        groups.append(f'<li style="flex:{len(ids)} 1 0" role="img" aria-label="{escape(label, quote=True)}" title="{escape(label, quote=True)}">'
                       f'{cells}</li>')
     return f'<ul class="ld-strip" aria-label="Lessons by topic">{"".join(groups)}</ul>'
 
@@ -97,7 +186,6 @@ def lesson_strip(progress: dict) -> str:
 def today():
     show_flash()
     now = datetime.now()
-    st.title(_greeting(now))
     active = db.query("SELECT * FROM activity WHERE id=1")
     current = (active[0]["kind"], active[0]["target_id"], active[0].get("target_key")) if active else None
     label = activity_label(*current) if current else None
@@ -105,77 +193,79 @@ def today():
     completed = sum(1 for lid in progress if learn.status(lid, progress) == "Completed")
     started = sum(1 for lid in progress if learn.status(lid, progress) == "In progress")
     notes = [n for n in db.query("SELECT * FROM lesson_notes ORDER BY updated_at DESC") if n["text"].strip()]
-    # The finding, under the title: where Continue goes, and how far through the collection you are.
-    where = f"You were in **{label}**." if label else "Nothing is open yet."
-    st.markdown(f"{now:%A %d %B} · {where} {completed} of {len(LESSONS)} lessons completed.")
+    night = now.hour < 6 or now.hour >= 18
+    page_header(_greeting(now), f"{now:%A %d %B} · {completed} of {len(LESSONS)} lessons completed",
+                _time_icon(now), "teal", art=pixels.img(pixels.desk_scene(night), 240))
 
-    with st.container(key="tiles"):
-        tiles = st.columns(4)
-    with tiles[0]:
-        _tile("Lessons completed", completed, f" of {len(LESSONS)}", "Marked complete by you", "done")
-    with tiles[1]:
-        _tile("In progress", started, " lessons", "Your place in each is kept", "open")
-    with tiles[2]:
-        _tile("Lesson notes", len(notes), "", "Never sent to a model", "notes")
-    with tiles[3]:
-        _tile("Library", len(db.list_resources()), " resources", "Your own reading", "library")
+    # Read order: where you left off and how far you are, a fresh idea and the wider map, what comes next,
+    # then your own material.
+    main, aside = st.columns([2, 1])
+    with main:
+        _continue_panel(current, label)
+    with aside, st.container(border=True, key="panel-path", height="stretch"):
+        ready_topics = sum(1 for t in TOPICS if any(lid in LESSONS for lid in t.lessons))
+        heading("route", "Your progress", f"{len(LESSONS)} lessons across {ready_topics} topics")
+        progress_ring(completed, started, len(LESSONS))
+        st.html(lesson_strip(progress))
+        st.caption("One bar per lesson, grouped by topic.")
+        if "explore" in PAGES:
+            st.page_link(PAGES["explore"], label="See all topics", icon=":material/map:")
 
-    main, aside = st.columns([9, 3])
-    with main, st.container(border=True, key="hero-continue", height="stretch"):
-        st.markdown("**Continue**")
-        if label:
-            st.markdown(f"### {label}")
-            st.caption(activity_context(*current))
-            if st.button("Continue learning", type="primary", icon=":material/play_arrow:"):
-                resume(*current)
-            if current[0] == "lesson" and current[2] in LESSONS:
-                lesson = LESSONS[current[2]]
-                answered = {a["check_id"] for a in db.check_attempts(lesson.id)}
-                sections = [s.title for s in lesson.walkthrough()]
-                st.caption(f"{len(sections)} sections: " + " · ".join(sections))
-                st.caption(f"Quick check: {len(answered)} of {len(lesson.checks)} questions answered so far.")
-        else:
-            st.markdown("### Start with the first lesson")
-            st.caption(f"{next(iter(LESSONS.values())).title} · about {next(iter(LESSONS.values())).minutes} minutes. "
-                       "Or open your Library to read your own material.")
-            with st.container(horizontal=True, gap="small"):
-                if st.button("Start with the first lesson", type="primary", icon=":material/school:"):
-                    open_lesson(next(iter(LESSONS)))
-                if st.button("Choose a resource", icon=":material/local_library:"):
-                    st.session_state.pop("resource_id", None)
-                    st.session_state.pop("active_quiz", None)
-                    go("library")
-    with aside, st.container(border=True, key="panel-notes", height="stretch"):
-        st.markdown("**Recent notes**")
+    idea_col, tracks_col = st.columns([1, 2])
+    with idea_col:
+        _idea_of_the_day()
+    with tracks_col:
+        _track_tiles(progress)
+
+    # The lesson already offered in the Continue panel is not repeated here.
+    shown = current[2] if current and current[0] == "lesson" and label else (None if label else next(iter(LESSONS)))
+    suggested = [l for l in learn.suggestions(progress, 4) if l.id != shown][:3]
+    if suggested:
+        heading("arrow_forward", "Next up", "Started lessons first, then ones you are ready for",
+                large=True)
+        cols = st.columns(3)
+        for col, lesson in zip(cols, suggested):
+            topic = TOPIC_BY_ID[lesson.topic]
+            with col, st.container(border=True, key=f"card-next-{lesson.id}", height="stretch"):
+                heading(topic.icon, lesson.title, f"{topic.title} · {lesson.minutes} min",
+                        hue=TRACK_HUES[topic.track])
+                st.html(f'<div class="ld-thumb-wrap">{svg_img(visuals.thumbnail(lesson.topic), "", "ld-thumb")}</div>')
+                status_badge(learn.status(lesson.id, progress))
+                verb = "Continue" if learn.status(lesson.id, progress) == "In progress" else "Open lesson"
+                if st.button(verb, key=f"next-{lesson.id}", icon=":material/arrow_forward:"):
+                    open_lesson(lesson.id)
+        if len(suggested) < 3 and "explore" in PAGES:
+            # Fewer suggestions than slots: the spare slot leads to the full map instead of sitting empty.
+            with cols[len(suggested)], st.container(border=True, key="card-next-browse", height="stretch"):
+                heading("explore", "Browse all topics", "Lessons can be read in any order", hue="teal")
+                st.page_link(PAGES["explore"], label="Open Explore", icon=":material/arrow_forward:")
+
+    heading("edit_note", "Your own material", "Stays on this computer unless you ask for AI help", large=True)
+    notes_col, desk_col = st.columns(2)
+    with notes_col, st.container(border=True, key="panel-notes", height="stretch"):
+        heading("sticky_note_2", "Recent lesson notes", hue="violet")
         if not notes:
-            st.caption("Notes you write beside a lesson appear here.")
-        for note in notes[:2]:
+            empty_state("Notes you write beside a lesson appear here.")
+        for note in notes[:3]:
             lesson = curriculum.get(note["lesson_id"])
             st.markdown(f"{lesson.title if lesson else note['lesson_id']}")
             first = note["text"].strip().splitlines()[0]
             st.caption(first if len(first) <= 90 else first[:first.rfind(" ", 0, 88)] + "…")
         if "notebook" in PAGES:
-            st.page_link(PAGES["notebook"], label="View all")
+            st.page_link(PAGES["notebook"], label="All notes in Notebook", icon=":material/book_2:")
+    with desk_col, st.container(border=True, key="panel-desk", height="stretch"):
+        heading("collections_bookmark", "Library and queue", hue="amber")
+        stats([("collections_bookmark", "Library resources", len(db.list_resources()), "", "amber"),
+               ("book_2", "Notebook sessions", len(db.list_sessions()), "", "violet"),
+               ("sticky_note_2", "Lesson notes", len(notes), "", "violet"),
+               ("checklist", "Open questions and tasks", len(db.list_queue(status="open")), "", "green")])
+        with st.container(horizontal=True, gap="small"):
+            if "library" in PAGES:
+                st.page_link(PAGES["library"], label="Library", icon=":material/collections_bookmark:")
+            if "queue" in PAGES:
+                st.page_link(PAGES["queue"], label="Queue", icon=":material/checklist:")
 
-    path, nxt = st.columns(2)
-    with path, st.container(border=True, key="panel-path", height="stretch"):
-        st.markdown("**Your path through the lessons**")
-        st.html(lesson_strip(progress))
-        st.caption(f"One cell per lesson, grouped by topic. Filled: completed ({completed}). "
-                   f"Half: in progress ({started}). Empty: not started ({len(LESSONS) - completed - started}).")
-        if "explore" in PAGES:
-            st.page_link(PAGES["explore"], label="Open the map of all ten topics", icon=":material/map:")
-    with nxt, st.container(border=True, key="panel-next", height="stretch"):
-        st.markdown("**Next up**")
-        for lesson in learn.suggestions(progress, 2):
-            with st.container(border=True, key=f"row-next-{lesson.id}"):
-                c1, c2 = st.columns([4, 1.3], vertical_alignment="center")
-                c1.markdown(f"{lesson.title}")
-                c1.caption(f"{TOPIC_BY_ID[lesson.topic].title} · {lesson.minutes} min · {lesson.level}")
-                if c2.button("Open", key=f"next-{lesson.id}"):
-                    open_lesson(lesson.id)
-
-    with st.expander("Choose or change activity"):
+    with st.expander("Switch to another activity or start a notebook session", icon=":material/swap_horiz:"):
         resources = db.list_resources()
         unfinished = db.query(
             "SELECT qs.* FROM question_sets qs LEFT JOIN quiz_progress p ON p.set_id=qs.id "
@@ -211,9 +301,8 @@ def _review_text(call) -> str:
 
 def notebook():
     show_flash()
-    st.title("Notebook")
-    st.caption("Your own notes, lesson notes, and earlier AI reviews in one place. Opening anything here "
-               "makes no model call.")
+    page_header("Notebook", "Your sessions, lesson notes and earlier AI reviews. Opening anything here makes no "
+                "model call.", "book_2", "violet", art=pixels.img(pixels.notebook_scene(), 224))
     sessions_tab, lessons_tab, reviews_tab = st.tabs(
         [":material/edit_note: Sessions", ":material/sticky_note_2: Lesson notes", ":material/rate_review: Reviews"])
     with sessions_tab:
@@ -248,7 +337,7 @@ def notebook():
     with lessons_tab:
         notes = [n for n in db.query("SELECT * FROM lesson_notes ORDER BY updated_at DESC") if n["text"].strip()]
         if not notes:
-            st.caption("Notes you write beside a lesson appear here.")
+            empty_state("Notes you write beside a lesson appear here.")
         for note in notes:
             lesson = curriculum.get(note["lesson_id"])
             with st.container(border=True, key=f"card-note-{note['lesson_id']}"):

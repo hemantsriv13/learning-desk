@@ -17,11 +17,16 @@ from learning_desk.curriculum.model import VIEWS
 
 def test_collection_is_consistent_and_substantial():
     assert curriculum.PROBLEMS == []
-    assert len(curriculum.TOPICS) == 10
+    assert len(curriculum.TOPICS) == 40
     assert len(curriculum.LESSONS) >= 12
-    # Every topic has at least one finished lesson, and outlines are never presented as lessons.
+    # Every core topic has at least one finished lesson; planned tracks hold outlines only, and outlines are
+    # never presented as lessons.
     for topic in curriculum.TOPICS:
-        assert any(lid in curriculum.LESSONS for lid in topic.lessons), topic.id
+        if topic.track == curriculum.CORE:
+            assert any(lid in curriculum.LESSONS for lid in topic.lessons), topic.id
+        else:
+            assert topic.lessons and all(lid in curriculum.OUTLINES for lid in topic.lessons), topic.id
+    assert [t.number for t in curriculum.TOPICS] == list(range(1, len(curriculum.TOPICS) + 1))
     assert not set(curriculum.LESSONS) & set(curriculum.OUTLINES)
     assert all(o.status == "outline" for o in curriculum.OUTLINES.values())
 

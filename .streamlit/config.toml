@@ -14,35 +14,42 @@ serverAddress = "localhost"
 toolbarMode = "minimal"
 
 [theme]
-# Warm near-black, low-glare reading theme. Elevation is a lightness step (ground #0e0d0c, panels #181716);
-# the one hue is teal and it marks data and progress, never buttons, tabs or navigation.
+# Black page with graphite cards (ground #050505, panels #2a2a2a, card edge #4a4a4a).
+# Mint marks data, progress and the one primary action.
 base = "dark"
-primaryColor = "#6db3c4"
-backgroundColor = "#0e0d0c"
-secondaryBackgroundColor = "#181716"
-textColor = "#ebebe9"
-linkColor = "#ebebe9"
-borderColor = "#2b2826"
+primaryColor = "#3ddc97"
+backgroundColor = "#050505"
+secondaryBackgroundColor = "#2a2a2a"
+textColor = "#f0f0f0"
+linkColor = "#f0f0f0"
+borderColor = "#444444"
 showWidgetBorder = true
 showSidebarBorder = true
 baseRadius = "14px"
 buttonRadius = "full"
-font = "Hanken Grotesk, system-ui, sans-serif"
-headingFont = "Hanken Grotesk, system-ui, sans-serif"
+font = "Inter, system-ui, sans-serif"
+headingFont = "Space Grotesk, Inter, system-ui, sans-serif"
 headingFontSizes = ["2rem", "1.5rem", "1.25rem"]
 headingFontWeights = [600, 600, 600]
-# Accents for the one highlighted phrase in a review (teal; muted amber for "One thing to clarify").
+# Accents for the one highlighted phrase in a review (mint; amber for "One thing to clarify").
 # Both are well over 7:1 against backgroundColor.
-blueTextColor = "#86c7d6"
-orangeTextColor = "#e0b46a"
+blueTextColor = "#7fe8b9"
+orangeTextColor = "#ffb347"
 
 [[theme.fontFaces]]
-# Hanken Grotesk, SIL Open Font License 1.1 (static/fonts/OFL.txt). One variable file, Latin subset.
-family = "Hanken Grotesk"
-url = "app/static/fonts/HankenGrotesk-latin.woff2"
+# Inter (body text), SIL Open Font License 1.1 (static/fonts/Inter-OFL.txt). One variable file, Latin subset.
+family = "Inter"
+url = "app/static/fonts/Inter-latin.woff2"
+weight = "400 700"
+style = "normal"
+
+[[theme.fontFaces]]
+# Space Grotesk (headings), SIL Open Font License 1.1 (static/fonts/SpaceGrotesk-OFL.txt). Variable, Latin subset.
+family = "Space Grotesk"
+url = "app/static/fonts/SpaceGrotesk-latin.woff2"
 weight = "400 700"
 style = "normal"
 
 [theme.sidebar]
-backgroundColor = "#0e0d0c"
-secondaryBackgroundColor = "#181716"
+backgroundColor = "#121212"
+secondaryBackgroundColor = "#2a2a2a"

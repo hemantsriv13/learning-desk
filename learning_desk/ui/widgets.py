@@ -43,7 +43,7 @@ def sampling(key: str) -> None:
              .mark_bar(cornerRadiusEnd=4)
              .encode(y=alt.Y("Candidate:N", sort=alt.SortField("Order"), title=None),
                      x=alt.X("Probability:Q", axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1]), title="Probability"),
-                     color=alt.condition("datum.Probability > 0", alt.value("#6DB3C4"), alt.value("#3D3935")),
+                     color=alt.condition("datum.Probability > 0", alt.value("#3ddc97"), alt.value("#4a4a4a")),
                      tooltip=["Candidate:N", "Shown:N"])
              .properties(height=280))
     text = " ".join(f"{r['Candidate']} {r['Shown']}." for r in rows)

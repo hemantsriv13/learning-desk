@@ -34,9 +34,11 @@ Starter suggestions are separate from your history; saving a starter bookmark do
 
 ## Explore and lessons
 
-**Explore** maps ten topics, from Python data shapes to AI product trade-offs. It ships **14 finished
-lessons**; the other 15 entries are clearly labelled *outlines* (planned objectives only) and cannot be opened
-as lessons. Each finished lesson has a learning objective, prerequisites, introduction, key ideas, a
+**Explore** maps 40 topics in six tracks. The **core path** (ten topics, from Python data shapes to AI product
+trade-offs) ships **14 finished lessons** and 15 outlines. Five planned tracks (working with model APIs, retrieval
+and knowledge, models and adaptation, agents and systems, shipping responsibly) add 30 topics with 90 outlines
+(`learning_desk/curriculum/topics_planned.py`). Outlines are clearly labelled (planned objectives only) and
+cannot be opened as lessons. Each finished lesson has a learning objective, prerequisites, introduction, key ideas, a
 walkthrough of explanation sections, a worked example, a misconception or limitation, a hands-on activity,
 deterministic quick-check questions, sources, and deeper reading.
 

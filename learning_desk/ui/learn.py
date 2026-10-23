@@ -3,13 +3,16 @@ static reviewed content, and the only AI-related action (saving a lesson to the 
 
 import streamlit as st
 
-from .. import curriculum, db, visuals
-from ..curriculum import LESSONS, OUTLINES, SOURCES, TOPIC_BY_ID, TOPICS, VIEWS
+from .. import curriculum, db, pixels, visuals
+from ..curriculum import CORE, LESSONS, OUTLINES, SOURCES, TOPIC_BY_ID, TOPICS, TRACK_ORDER, VIEWS
 from ..curriculum.model import Lesson
 from . import widgets
 from .common import go, open_lesson, show_flash
-from .theme import LEVEL_COLOURS, badges, status_badge, svg_img
+from .theme import LEVEL_COLOURS, TRACK_HUES, art_row, badges, heading, page_header, status_badge, steps, svg_img
 
+TRACK_ICONS = {"Core path": "school", "Working with model APIs": "api", "Retrieval and knowledge": "library_books",
+               "Models and adaptation": "memory", "Agents and systems": "smart_toy",
+               "Shipping responsibly": "verified_user"}
 VIEW_ICONS = {"Overview": ":material/dashboard:", "Walkthrough": ":material/route:",
               "Try it": ":material/science:", "Sources": ":material/library_books:"}
 
@@ -81,9 +84,9 @@ def explore() -> None:
         st.session_state["explore_topic"] = topic_id
         return topic_page(TOPIC_BY_ID[topic_id], progress)
 
-    st.title("Explore")
-    st.write(f"Ten topics for building with language models, from Python data shapes to product trade-offs. "
-             f"{len(LESSONS)} lessons are ready to read; the rest are clearly marked outlines.")
+    page_header("Explore", f"{len(TOPICS)} topics for building with language models. {len(LESSONS)} lessons are "
+                "ready to read; the rest are marked outlines.", "explore", "teal",
+                art=pixels.img(pixels.explore_scene(), 224))
     query = st.text_input("Search lessons", placeholder="e.g. tokens, JSON, retrieval, latency",
                           key="explore_search")
     if query.strip():
@@ -107,24 +110,51 @@ def explore() -> None:
                 lesson_card(lesson, progress, "suggested")
 
     st.subheader("The map")
-    st.caption("Each topic lists finished lessons first and planned outlines after. Open any topic; there is no fixed order.")
-    cols = st.columns(2)
-    for i, topic in enumerate(TOPICS):
-        ready, planned, completed = topic_counts(topic.id, progress)
-        with cols[i % 2], st.container(border=True, key=f"card-topic-{topic.id}"):
+    st.caption("Topics are grouped into tracks. The core path has finished lessons; the other tracks are planned "
+               "outlines for now. Open any topic; there is no fixed order.")
+    counts = {name: sum(1 for t in TOPICS if t.track == name) for name in TRACK_ORDER}
+    chosen = st.pills("Track", TRACK_ORDER, key="explore_track", label_visibility="collapsed",
+                      format_func=lambda name: f"{name} ({counts[name]})")
+    for name in [chosen] if chosen else TRACK_ORDER:
+        topics = [t for t in TOPICS if t.track == name]
+        lessons = sum(topic_counts(t.id, progress)[0] for t in topics)
+        note = (f"{len(topics)} topics · {lessons} lessons ready" if lessons
+                else f"{len(topics)} topics · planned outlines, not written yet")
+        heading(TRACK_ICONS.get(name, "category"), name, note, large=True, hue=TRACK_HUES.get(name, "gray"),
+                art=pixels.img(pixels.TRACK_ICONS[name](), 42) if name in pixels.TRACK_ICONS else "")
+        # One st.columns row per line of cards, so cards side by side share a height and their buttons line up.
+        per_row = 2 if name == CORE else 3
+        for start in range(0, len(topics), per_row):
+            for col, topic in zip(st.columns(per_row), topics[start:start + per_row]):
+                with col:
+                    topic_card(topic, progress, compact=name != CORE)
+
+
+def _open_topic(topic_id: str) -> None:
+    st.session_state["explore_topic"] = topic_id
+    st.query_params["topic"] = topic_id
+
+
+def topic_card(topic, progress: dict, compact: bool = False) -> None:
+    """A core topic shows its picture and progress; a planned topic is a smaller card with its outline count."""
+    ready, planned, completed = topic_counts(topic.id, progress)
+    with st.container(border=True, key=f"card-topic-{topic.id}", height="stretch"):
+        hue = TRACK_HUES.get(topic.track, "gray")
+        if compact:
+            heading(topic.icon, topic.title, f"Topic {topic.number}", hue=hue)
+            st.caption(topic.blurb)
+            st.caption(f":material/edit_note: {planned} planned lessons · not written yet")
+        else:
+            heading(topic.icon, topic.title, f"Topic {topic.number}", hue=hue)
             art, text = st.columns([1, 2.6], vertical_alignment="center")
             with art:
                 st.html(svg_img(visuals.thumbnail(topic.id), "", "ld-thumb"))
             with text:
-                st.caption(f"TOPIC {topic.number}")
-                st.markdown(f":material/{topic.icon}: **{topic.title}**")
                 st.caption(topic.blurb)
             st.progress(completed / ready if ready else 0.0,
                         text=f"{completed} of {ready} lessons completed · {planned} planned")
-            if st.button("Open topic", key=f"topic-{topic.id}", icon=":material/arrow_forward:"):
-                st.session_state["explore_topic"] = topic.id
-                st.query_params["topic"] = topic.id
-                st.rerun()
+        st.button("See planned lessons" if compact and not ready else "Open topic", key=f"topic-{topic.id}",
+                  icon=":material/arrow_forward:", on_click=_open_topic, args=(topic.id,))
 
 
 def topic_page(topic, progress: dict) -> None:
@@ -132,13 +162,19 @@ def topic_page(topic, progress: dict) -> None:
         st.session_state.pop("explore_topic", None)
         st.query_params.pop("topic", None)
         st.rerun()
-    st.caption(f"TOPIC {topic.number} OF {len(TOPICS)}")
-    st.title(f":material/{topic.icon}: {topic.title}")
+    page_header(topic.title, f"Topic {topic.number} of {len(TOPICS)} · {topic.track}", topic.icon,
+                TRACK_HUES.get(topic.track, "gray"),
+                art=pixels.img(pixels.TRACK_ICONS[topic.track](), 84) if topic.track in pixels.TRACK_ICONS else "")
     st.write(topic.blurb)
     st.caption(f"Why it matters: {topic.why}")
     ready, planned, completed = topic_counts(topic.id, progress)
-    st.progress(completed / ready if ready else 0.0,
-                text=f"{completed} of {ready} finished lessons completed · {planned} outline(s) planned")
+    if ready:
+        st.progress(completed / ready, text=f"{completed} of {ready} finished lessons completed · "
+                                            f"{planned} outline(s) planned")
+    else:
+        art_row(pixels.img(pixels.robot_builder(), 88),
+                f"Still being built. These {planned} lessons in the {topic.track} track are outlines of what each "
+                "will cover.")
     for item in curriculum.topic_items(topic.id):
         lesson_card(item, progress, "topic")
     others = [t for t in TOPICS if t.id != topic.id]
@@ -226,7 +262,7 @@ def lesson_page() -> None:
     if st.button(f"{topic.title}", icon=":material/arrow_back:", key="back-to-topic", type="tertiary"):
         st.session_state["explore_topic"] = topic.id
         go("explore", topic=topic.id)
-    st.title(lesson.title)
+    page_header(lesson.title, "", topic.icon, TRACK_HUES.get(topic.track, "gray"))
     label = status(lesson.id)
     badges((label, *_badge_style(label)), (lesson.level, LEVEL_COLOURS[lesson.level], None),
            (f"{lesson.minutes} min", "gray", ":material/schedule:"),
@@ -327,6 +363,7 @@ def walkthrough(lesson: Lesson) -> None:
              on_change=_save_section, args=(lesson,))
     current = st.session_state[section_key]
     index = [s.id for s in sections].index(current)
+    st.html(steps(len(sections), index, f"Section {index + 1} of {len(sections)}"))
     render_section(lesson, sections[index], "walk")
     st.divider()
     with st.container(horizontal=True, gap="small"):
@@ -407,8 +444,40 @@ def try_it(lesson: Lesson) -> None:
         st.info(activity.reflection, icon=":material/psychology:")
     st.divider()
     quick_check(lesson)
+    finish(lesson)
     st.divider()
     personalised(lesson)
+
+
+def _toggle_complete(lesson: Lesson, done: bool) -> None:
+    db.set_lesson_status(lesson.id, lesson.version, not done)
+
+
+def finish(lesson: Lesson) -> None:
+    """The end of a lesson: mark it complete, then go straight on to the next suggested lesson."""
+    progress = all_progress()
+    done = status(lesson.id, progress) == "Completed"
+    # Next means forward on the map: the first unfinished lesson after this one, wrapping round to the start.
+    ordered = [lid for t in TOPICS for lid in t.lessons if lid in LESSONS]
+    at = ordered.index(lesson.id)
+    nxt = next((LESSONS[lid] for lid in ordered[at + 1:] + ordered[:at]
+                if status(lid, progress) != "Completed"), None)
+    # Until the quick check is through, "Check answer" stays the one primary action on the page.
+    checked = st.session_state.get(f"check_pos_{lesson.id}", 0) >= len(lesson.checks)
+    with st.container(border=True, key=f"card-finish-{lesson.id}"):
+        heading("task_alt" if done else "flag", "Lesson complete" if done else "Finish this lesson",
+                f"Next: {nxt.title}" if nxt else "You have finished every lesson that is ready.",
+                hue="green" if done else "teal")
+        if done:
+            art_row(pixels.img(pixels.trophy(), 88), "Nicely done. Your place and notes stay saved if you come back.")
+        with st.container(horizontal=True, gap="small"):
+            if not done:
+                st.button("Mark complete", type="primary" if checked else "secondary", icon=":material/task_alt:",
+                          key="finish-complete",
+                          on_click=_toggle_complete, args=(lesson, done))
+            if nxt and st.button(f"Next lesson: {nxt.title}", key="finish-next", icon=":material/arrow_forward:",
+                                 type="primary" if done else "secondary"):
+                open_lesson(nxt.id)
 
 
 def personalised(lesson: Lesson) -> None:
@@ -493,14 +562,14 @@ def _source_row(cite) -> None:
 def side_panel(lesson: Lesson) -> None:
     with st.container(border=True, key=f"side-{lesson.id}"):
         label = status(lesson.id)
-        st.markdown("**Progress**")
+        heading("flag", "Progress")
         status_badge(label)
         done = label == "Completed"
         if st.button("Not complete" if done else "Mark complete", key="toggle-complete",
                      icon=":material/undo:" if done else ":material/task_alt:", use_container_width=True):
             db.set_lesson_status(lesson.id, lesson.version, not done)
             st.rerun()
-        st.markdown("**In this lesson**")
+        heading("format_list_numbered", "In this lesson", tone="quiet")
         current = st.session_state.get(f"section_{lesson.id}")
         in_walk = st.session_state.get(f"view_{lesson.id}") == "Walkthrough"
         for i, section in enumerate(lesson.walkthrough(), 1):
